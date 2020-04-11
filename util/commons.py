@@ -1,24 +1,31 @@
 import pandas as pd
+import numpy as np
 import eli5
-import enum
 import xai
 import logging as log
+import enum
 
 from xai import data
 from lime.lime_tabular import LimeTabularExplainer
 from functools import partial
-from IPython.core.display import display
 from ipywidgets import widgets
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, r2_score, mean_squared_error
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
+from pandas.api.types import is_numeric_dtype, is_string_dtype
+from multipledispatch import dispatch
+
+from util.dataset import Datasets, Dataset
+from util.model import Algorithm, Model, ModelType, ProblemType
+from util.split import Split, SplitTypes
 
 NUMERIC_TYPES = ["int", "float"]
 RANDOM_NUMBER = 33
@@ -27,156 +34,13 @@ EXAMPLES_SPAN_LIME = 10
 EXAMPLES_DIR_LIME = "lime_results"
 TEST_SPLIT_SIZE = 0.3
 
+
 # Configure logger
 log.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 log.getLogger().setLevel(log.DEBUG)
 
 # Remove DataFrame display limitation
 pd.set_option('display.max_columns', None)
-
-
-class Models(enum.Enum):
-    LOGISTIC_REGRESSION = 1
-    DECISION_TREE = 2
-    RANDOM_FOREST = 3
-    XGB = 4
-
-
-class SplitTypes(enum.Enum):
-    IMBALANCED = 1
-    BALANCED = 2
-
-
-class Model:
-    def __init__(self, id: int, name: str, model: Pipeline, X: pd.DataFrame, y: pd.Series):
-        self._id = id
-        self._name = name
-        self._model = model
-        self._X = X
-        self._y = y
-        self._X_test = None
-        self._y_test = None
-        # Frontend Widgets associated with this model.
-        self._remove_features_sm = None                 # sm -> Select Multiple
-        self._remove_features_button = None
-        self._train_model_button = None
-        self._model_type_dd = None
-        self._split_type_dd = None
-        self._cross_columns_sm = None
-
-    @property
-    def id(self):
-        return self._id
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, new_value):
-        self._name = new_value
-
-    @property
-    def model(self):
-        return self._model
-
-    @model.setter
-    def model(self, new_value):
-        self._model = new_value
-
-    @property
-    def X(self):
-        return self._X
-
-    @X.setter
-    def X(self, new_value):
-        self._X = new_value
-
-    @property
-    def y(self):
-        return self._y
-
-    @y.setter
-    def y(self, new_value):
-        self._y = new_value
-
-    @property
-    def X_test(self):
-        return self._X_test
-
-    @X_test.setter
-    def X_test(self, new_value):
-        self._X_test = new_value
-
-    @property
-    def y_test(self):
-        return self._y_test
-
-    @y_test.setter
-    def y_test(self, new_value):
-        self._y_test = new_value
-
-    @property
-    def remove_features_sm(self):
-        return self._remove_features_sm
-
-    @remove_features_sm.setter
-    def remove_features_sm(self, new_value):
-        self._remove_features_sm = new_value
-
-    @property
-    def remove_features_button(self):
-        return self._remove_features_button
-
-    @remove_features_button.setter
-    def remove_features_button(self, new_value):
-        self._remove_features_button = new_value
-
-    @property
-    def model_type_dd(self):
-        return self._model_type_dd
-
-    @model_type_dd.setter
-    def model_type_dd(self, new_value):
-        self._model_type_dd = new_value
-
-    @property
-    def split_type_dd(self):
-        return self._split_type_dd
-
-    @split_type_dd.setter
-    def split_type_dd(self, new_value):
-        self._split_type_dd = new_value
-
-    @property
-    def cross_columns_sm(self):
-        return self._cross_columns_sm
-
-    @cross_columns_sm.setter
-    def cross_columns_sm(self, new_value):
-        self._cross_columns_sm = new_value
-
-    @property
-    def train_model_button(self):
-        return self._train_model_button
-
-    @train_model_button.setter
-    def train_model_button(self, new_value):
-        self._train_model_button = new_value
-
-
-class Split:
-    def __init__(self, type: SplitTypes, value: list):
-        self._type = type
-        self._value = value
-
-    @property
-    def type(self):
-        return self._type
-
-    @property
-    def value(self):
-        return self._value
 
 
 def explain_single_instance(classifier: Pipeline,
@@ -215,8 +79,8 @@ def explain_single_instance(classifier: Pipeline,
                                      discretize_continuous=True,
                                      random_state=RANDOM_NUMBER)
 
-    # log.info("Person {}'s data: \n{}".format(example, X_test.iloc[example]))
-    log.info("Person {}'s actual result: {}".format(example, y_test[example]))
+    log.info("Example {}'s data: \n{}".format(example, X_test.iloc[example]))
+    log.info("Example {}'s actual result: {}".format(example, y_test[example]))
 
     custom_model_predict_proba = partial(custom_predict_proba, model=classifier)
     observation = convert_to_lime_format(X_test.iloc[[example], :], categorical_names).values[0]
@@ -269,13 +133,10 @@ def divide_features(df: pd.DataFrame) -> (list, list):
     num = []
     cat = []
 
-    for n, t in df.dtypes.items():
-        is_numeric = False
-        for nt in NUMERIC_TYPES:
-            if str(t).startswith(nt):
-                is_numeric = True
-                num.append(n)
-        if not is_numeric:
+    for n in df.columns:
+        if is_numeric_dtype(df[n]):
+            num.append(n)
+        elif is_string_dtype(df[n]):
             cat.append(n)
 
     return num, cat
@@ -297,24 +158,29 @@ def get_column_transformer(numerical: list, categorical: list) -> ColumnTransfor
                     ('cat', categorical_transformer, categorical)])
 
 
-def get_pipeline(ct: ColumnTransformer, model: Models) -> Pipeline:
+def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm) -> Pipeline:
 
-    if model is Models.LOGISTIC_REGRESSION:
+    if algorithm is Algorithm.LOGISTIC_REGRESSION:
         return Pipeline([("preprocessor", ct),
                          ("model",
                          LogisticRegression(class_weight="balanced",
                                             solver="liblinear",
                                             random_state=RANDOM_NUMBER))])
-    elif model is Models.DECISION_TREE:
+    elif algorithm is Algorithm.DECISION_TREE:
         return Pipeline([("preprocessor", ct),
                          ("model", DecisionTreeClassifier(class_weight="balanced"))])
-    elif model is Models.RANDOM_FOREST:
+    elif algorithm is Algorithm.RANDOM_FOREST:
         return Pipeline([("preprocessor", ct),
                          ("model", RandomForestClassifier(class_weight="balanced", n_estimators=100, n_jobs=-1))])
-    elif model is Models.XGB:
-        # scale_pos_weight to make it balanced
+    elif algorithm is Algorithm.XGB:
         return Pipeline([("preprocessor", ct),
                          ("model", XGBClassifier(n_jobs=-1))])
+    elif algorithm is Algorithm.LINEAR_REGRESSION:
+        return Pipeline([("preprocessor", ct),
+                         ("model", LinearRegression(n_jobs=-1))])
+    elif algorithm is Algorithm.SVM:
+        return Pipeline([("preprocessor", ct),
+                         ("model", SVC(kernel='poly', degree=8))])
     else:
         raise NotImplementedError
 
@@ -333,7 +199,6 @@ def get_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Ser
     elif split.type is SplitTypes.IMBALANCED:
         X_train, X_test, y_train, y_test = train_test_split(df_x,
                                                             df_y,
-                                                            stratify=df_y,
                                                             test_size=TEST_SPLIT_SIZE,
                                                             random_state=RANDOM_NUMBER)
         return X_train, X_test, y_train, y_test
@@ -354,7 +219,7 @@ def get_all_features(model: Pipeline, num_features: list, cat_features: list) ->
     return num_features + get_ohe_cats(model, cat_features)
 
 
-def train_model(model_type: Models, split: Split, df_x: pd.DataFrame, df_y: pd.Series) -> \
+def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: pd.Series) -> \
         (Pipeline, pd.DataFrame, pd.Series):
 
     num_features, cat_features = divide_features(df_x)
@@ -365,7 +230,7 @@ def train_model(model_type: Models, split: Split, df_x: pd.DataFrame, df_y: pd.S
     # Transform the categorical features to numerical
     preprocessor = get_column_transformer(num_features, cat_features)
 
-    model = get_pipeline(preprocessor, model_type)
+    model = get_pipeline(preprocessor, model_type.algorithm)
 
     X_train, X_test, y_train, y_test = get_split(split, cat_features, df_x, df_y)
 
@@ -374,8 +239,16 @@ def train_model(model_type: Models, split: Split, df_x: pd.DataFrame, df_y: pd.S
 
     # Generate predictions
     y_pred = model.predict(X_test)
-    log.info("Model accuracy: {}".format(accuracy_score(y_test, y_pred)))
-    log.info("Classification report: \n{}".format(classification_report(y_test, y_pred)))
+
+    # classification
+    if model_type.problem_type == ProblemType.CLASSIFICATION:
+        log.info("Model accuracy: {}".format(accuracy_score(y_test, y_pred)))
+        log.info("Classification report: \n{}".format(classification_report(y_test, y_pred)))
+    # regression
+    elif model_type.problem_type == ProblemType.REGRESSION:
+        log.info("R2 score : %.2f" % r2_score(y_test, y_pred))
+        log.info("Mean squared error: %.2f" % mean_squared_error(y_test, y_pred))
+        log.info("RMSE number:  %.2f" % pd.np.sqrt(mean_squared_error(y_test, y_pred)))
 
     return model, X_test, y_test
 
@@ -386,64 +259,214 @@ def interpret_model(model: Pipeline, num_features, cat_features):
                                                             num_features,
                                                             cat_features))
 
-#######################################################################################################################
+
+@dispatch(str)
+def get_dataset(id: str) -> (Dataset, str):
+    """
+    Get a dataset from the built-in datasets.
+    :param id: The id (must be equal to the Datasets enum name) of the dataset
+    :return: A fully loaded dataset, A message for the user
+    """
+    dataset = Dataset.built_in(id)
+    msg = "Dataset \'{} ({})\' loaded successfully. For further information about this dataset please visit: {}"\
+        .format(dataset.id.name, dataset.name, dataset.url)
+    log.info(msg)
+    log.info("\n{}".format(dataset.df.head()))
+
+    return dataset, msg
 
 
-class OutputWidgetHandler(log.Handler):
-    """ Custom logging handler sending logs to an output widget """
+@dispatch(str, str)
+def get_dataset(name: str, url: str) -> (Dataset, str):
+    """
+    Get a dataset from an URL (external source).
+    :param name: The name of the dataset.
+    :param url: The URL from which the dataset should be (down-)loaded
+    :return: A fully loaded dataset, A message for the user
+    """
+    dataset = Dataset.from_url(name, url)
+    msg = "Dataset \'{} ({})\' loaded successfully. For further information about this dataset please visit: {}"\
+        .format(dataset.id.name, dataset.name, dataset.url)
+    log.info(msg)
+    log.info("\n{}".format(dataset.df.head()))
 
-    def __init__(self, *args, **kwargs):
-        super(OutputWidgetHandler, self).__init__(*args, **kwargs)
-        layout = {
-            'width': '100%',
-            'height': '160px',
-            'border': '1px solid black'
-        }
-        self.out = widgets.Output(layout=layout)
-
-    def emit(self, record):
-        """ Overload of logging.Handler method """
-        formatted_record = self.format(record)
-        new_output = {
-            'name': 'stdout',
-            'output_type': 'stream',
-            'text': formatted_record + '\n'
-        }
-        self.out.outputs = (new_output,) + self.out.outputs
-
-    def show_logs(self):
-        """ Show the logs """
-        display(self.out)
-
-    def get_logs(self):
-        """ Return the logs """
-        result = ''
-        for line in self.out.outputs:
-            result = result + line['text']
-
-        return result
-
-    def clear_logs(self):
-        """ Clear the current logs """
-        self.out.clear_output()
+    return dataset, msg
 
 
-def get_dataset_as_dataframe(name: str) -> pd.DataFrame:
-    df = data.load_census()
-    return df
+def change_cross_columns_status(model: Model, new_value: str) -> str:
+    """
+    Enables/Disables the cross columns select multiple widget.
+    :param model: Model for which the status shall be changed.
+    :param new_value: The new value of the widget.
+    :return: Message indicating that the status was successfully changed.
+    """
+    msg = "Cross columns status was successfully changed to "
+    if new_value == SplitTypes.BALANCED.name:
+        model.cross_columns_sm.disabled = False
+        msg = msg + "enabled."
+    elif new_value == SplitTypes.IMBALANCED.name:
+        model.cross_columns_sm.disabled = True
+        msg = msg + "disabled."
+
+    log.debug(msg)
+    return msg
 
 
-def get_grid_template_columns(number_of_models: int, min_number: int) -> str:
-    grid_template_columns = ''
-    if number_of_models > min_number:
-        part = 100.0/number_of_models
-        for i in range(number_of_models):
-            grid_template_columns = grid_template_columns + str(part) + "% "
+def show_target(df: pd.DataFrame, new_value: str):
+    """
+    Generate a message to be displayed to the user when new target is selected.
+    :param df: The dataset as a dataframe.
+    :param new_value: The new target that was selected.
+    :return: (Series containing only the head of the target, A message to be displayed to the user)
+    """
 
+    df_target = None
+    msg = ""
+    if new_value is not None:
+        df_target = df[new_value].head(5)
+        msg = 'Target \'{0}\' value changed successfully.\n{1}'.format(new_value, df_target)
+        log.debug(msg)
     else:
-        grid_template_columns = '33% 33% 33%'
+        msg = "No target was selected. Please select a target."
+        log.error(msg)
 
-    return grid_template_columns
+    return df_target, msg
+
+
+def split_feature_target(df: pd.DataFrame, target: str) -> (pd.DataFrame, pd.Series, str):
+    """
+    Divides the dataset into features and target.
+    :param df: The dataset as a dataframe.
+    :param target: The target selected by the user.
+    :return: (Features as a dataframe, Target as series, A message to be displayed to the user)
+    """
+
+    msg = ""
+    df_X = None
+    df_y = None
+
+    if target is not None:
+        df_X = df.drop(target, axis=1)
+        df_y = df[target]
+
+        msg = 'Target \'{}\' selected successfully.'.format(target)
+        log.info(msg)
+    else:
+        msg = "No target was selected. Please select a target."
+        log.error(msg)
+
+    return df_X, df_y, msg
+
+
+def calculate_slider_properties(unique_values: np.ndarray) -> (float, float, float):
+    """
+    Calculates the min and max values for a slider based on the values in a column and its step based on min and max.
+    :param unique_values: The unique values in a column
+    :return: (min, max, step) values for the slider
+    """
+    min_val = min(unique_values)
+    max_val = max(unique_values)
+    step = (max_val - min_val)/100.0
+
+    return min_val, max_val, 1.0 if step < 1.0 else step
+
+
+def get_stripped_df(df: pd.DataFrame, column, value, eq_value: str = '=') -> pd.DataFrame:
+    """
+    Strips a dataframe based on a value and a sign.
+    :param df: The dataframe to be stripped
+    :param column: The column to be stripped
+    :param value: The new value that should be used for the eq on the column
+    :param eq_value: Whether >,< or = should be applied
+    :return: The stripped dataframe
+    """
+
+    df_strip = None
+    if eq_value == '>':
+        df_strip = df.loc[df[column] > value]
+    elif eq_value == '=':
+        df_strip = df.loc[df[column] == value]
+    elif eq_value == '<':
+        df_strip = df.loc[df[column] < value]
+
+    return df_strip
+
+
+def remove_model_features(model: Model) -> str:
+    """
+    Removes features selected by the user from a model.
+    :param model: The model, for which features should be removed.
+    :return: Message indicating that the features were successfully removed.
+    """
+    features = list(model.remove_features_sm.value)
+    df_X_new = model.X.drop(columns=features, axis=1)
+    model.X = df_X_new
+
+    msg = 'Features: {} were removed successfully for model {}.\n{}'.format(features, model.name, df_X_new.head(5))
+    log.info(msg)
+    return msg
+
+
+def fill_empty_models(df_X: pd.DataFrame, df_y: pd.Series, number_of_models: int) -> (list, str):
+    """
+    A list of models will be created, where each model gets a name and the initial X and y of the dataset.
+    :param df_X: Dataframe containing all columns of the dataset excluding the target.
+    :param df_y: Series containing the target of the dataset.
+    :param number_of_models: How many models should be trained.
+    :return: (models, message) - Models is a list containing the all initial models to be trained, Message is a
+    log message indicating that the operation was successful.
+    """
+    models = []
+    for m in range(number_of_models):
+        models.append(Model(m, "Model " + str(m+1), None, df_X, df_y, get_model_type(df_y)))
+
+    msg = "Models to be trained: \'{}\'.".format(number_of_models)
+    log.debug(msg)
+    return models, msg
+
+
+def fill_model(model: Model) -> str:
+    """
+    A model is trained based on the properties selected by the user.
+    :param model: The model to be filled - trained and then saved.
+    :return: String message about the status of the model that should be displayed as info.
+    """
+    split_type = model.split_type_dd.value
+    split_feature = list(model.cross_columns_sm.value)
+    model.model_type.algorithm = Algorithm[model.model_type_dd.value]
+    if split_type == SplitTypes.BALANCED.name:
+        model_pipeline, X_test, y_test = \
+            train_model(model.model_type, Split(SplitTypes.BALANCED, split_feature), model.X, model.y)
+    elif split_type == SplitTypes.IMBALANCED.name:
+        model_pipeline, X_test, y_test = \
+            train_model(model.model_type, Split(SplitTypes.IMBALANCED, split_feature), model.X, model.y)
+    else:
+        msg = "Error occurred while training the model - {}: {}".format(model.name, model)
+        log.error(msg)
+        return msg
+    model.model = model_pipeline
+    model.X_test = X_test
+    model.y_test = y_test
+
+    msg = "Model {} trained successfully!".format(model.name)
+    log.info(msg)
+    return msg
+
+
+def get_model_type(y: pd.Series) -> ModelType:
+    """
+    Get the model type (problem type) by the target feature.
+    :param y: The target feature for the model to be trained.
+    :return: The corresponding model type for this target.
+    """
+
+    model_type = None
+    if is_string_dtype(y):
+        model_type = ModelType(ProblemType.CLASSIFICATION)
+    else:
+        model_type = ModelType(ProblemType.REGRESSION)
+
+    return model_type
 
 
 def get_model_by_id(models: list, id: int) -> Model:
