@@ -66,6 +66,7 @@ class Model:
         self._name = name
         self._model = model
         self._model_type = model_type
+        self._split = None
         self._X = X
         self._y = y
         self._X_test = None
@@ -106,6 +107,14 @@ class Model:
     @model_type.setter
     def model_type(self, new_value):
         self._model_type = new_value
+
+    @property
+    def split(self):
+        return self._split
+
+    @split.setter
+    def split(self, new_value):
+        self._split = new_value
 
     @property
     def X(self):

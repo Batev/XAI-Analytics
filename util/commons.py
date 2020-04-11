@@ -431,19 +431,14 @@ def fill_model(model: Model) -> str:
     :param model: The model to be filled - trained and then saved.
     :return: String message about the status of the model that should be displayed as info.
     """
-    split_type = model.split_type_dd.value
-    split_feature = list(model.cross_columns_sm.value)
+    # split_type = model.split_type_dd.value
+    # split_feature = list(model.cross_columns_sm.value)
     model.model_type.algorithm = Algorithm[model.model_type_dd.value]
-    if split_type == SplitTypes.BALANCED.name:
-        model_pipeline, X_test, y_test = \
-            train_model(model.model_type, Split(SplitTypes.BALANCED, split_feature), model.X, model.y)
-    elif split_type == SplitTypes.IMBALANCED.name:
-        model_pipeline, X_test, y_test = \
-            train_model(model.model_type, Split(SplitTypes.IMBALANCED, split_feature), model.X, model.y)
-    else:
-        msg = "Error occurred while training the model - {}: {}".format(model.name, model)
-        log.error(msg)
-        return msg
+    model.split = Split(SplitTypes[model.split_type_dd.value], list(model.cross_columns_sm.value))
+
+    model_pipeline, X_test, y_test = \
+        train_model(model.model_type, model.split, model.X, model.y)
+
     model.model = model_pipeline
     model.X_test = X_test
     model.y_test = y_test
