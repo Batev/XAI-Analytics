@@ -6,7 +6,7 @@ XAI-Analytics is a tool for analyzing datasets, interpreting machine learning mo
 
 ### Run Notebook online on _binder_
 
-1. Start the binder notebook server - [Start Server!](https://mybinder.org/v2/gh/Batev/XAI-Analytics/477b66b97505a0ac92962bcd73ad55e49e2e1a68)
+1. Start the binder notebook server - [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Batev/XAI-Analytics/master)
 2. Run *XAI-Analytics.ipynb* notebook file
 
 ### Run Notebook locally
