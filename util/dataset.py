@@ -215,4 +215,4 @@ def is_url_valid(url: str, disable_ssl_certificate_validation=True) -> (bool, by
     h = httplib2.Http(disable_ssl_certificate_validation=disable_ssl_certificate_validation)
     resp, content = h.request(url)
     status = int(resp['status'])
-    return status, content
+    return (200 >= status < 300), content

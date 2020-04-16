@@ -207,10 +207,17 @@ def get_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Ser
 
 
 def get_ohe_cats(model: Pipeline, cat_features: list) -> list:
+    """
+    Gets all encoded (with OneHotEncoder) features for a model.
+    :param model: Pipeline for the model.
+    :param cat_features: The initial categorical columns for the dataset.
+    :return: All encoded features for the model.
+    """
     preprocessor = model.named_steps["preprocessor"]
-    # Get all categorical columns (including the newly generated)
-    ohe_categories = preprocessor.named_transformers_["cat"].named_steps['onehot'].categories
-    new_ohe_features = [f"{col}__{val}" for col, vals in zip(cat_features, ohe_categories) for val in vals]
+    # Get all categorical columns (including the newly encoded with the OHE)
+    new_ohe_features = preprocessor.named_transformers_["cat"].named_steps['onehot']\
+        .get_feature_names(cat_features)\
+        .tolist()
 
     return new_ohe_features
 
