@@ -210,6 +210,28 @@ def generate_reset_strip_hbox(on_click_reset_button):
                            grid_gap='3px 3px'))
 
 
+def generate_global_interpretation_grid(models: list) -> HBox:
+    length = len(models)
+    children = []
+    min_number = 3
+
+    # Row 1
+    for m in models:
+        children.append(
+            Label(layout=Layout(width='auto', height='auto'), value='Global explanation for {}'.format(m.name)))
+    # Row 1: add dummy widgets
+    add_dummy_widgets(min_number, children, min_number)
+
+    return HBox(children=children,
+                layout=Layout(
+                           width='auto',
+                           grid_template_columns="50% 50%",
+                           align_items='center',
+                           # grid_template_columns='auto auto auto',
+                           grid_template_rows='auto',
+                           grid_gap='3px 3px'))
+
+
 def get_reset_strip_hbox_label(hbox: HBox) -> Label:
 
     for child in hbox.children:
