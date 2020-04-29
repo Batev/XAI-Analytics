@@ -192,8 +192,8 @@ def get_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Ser
         X_train_balanced, y_train_balanced, X_test_balanced, y_test_balanced, train_idx, test_idx = \
             xai.balanced_train_test_split(
                 df_x, df_y, *split.value,
-                min_per_group=600,
-                max_per_group=600,
+                min_per_group=300,
+                max_per_group=300,
                 categorical_cols=cat_features)
         return X_train_balanced, X_test_balanced, y_train_balanced, y_test_balanced
     elif split.type is SplitTypes.IMBALANCED:
@@ -231,6 +231,8 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
 
     num_features, cat_features = divide_features(df_x)
 
+
+
     log.debug("Numerical features: {}".format(num_features))
     log.debug("Categorical features: {}".format(cat_features))
 
@@ -257,7 +259,7 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
         log.info("Mean squared error: %.2f" % mean_squared_error(y_test, y_pred))
         log.info("RMSE number:  %.2f" % pd.np.sqrt(mean_squared_error(y_test, y_pred)))
 
-    return model, X_test, y_test
+    return model, X_train, y_train, X_test, y_test
 
 
 def interpret_model(model: Pipeline, num_features, cat_features):
@@ -443,10 +445,12 @@ def fill_model(model: Model) -> str:
     model.model_type.algorithm = Algorithm[model.model_type_dd.value]
     model.split = Split(SplitTypes[model.split_type_dd.value], list(model.cross_columns_sm.value))
 
-    model_pipeline, X_test, y_test = \
+    model_pipeline, X_train, y_train, X_test, y_test = \
         train_model(model.model_type, model.split, model.X, model.y)
 
     model.model = model_pipeline
+    model.X_train = X_train
+    model.y_train = y_train
     model.X_test = X_test
     model.y_test = y_test
 

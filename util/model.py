@@ -69,6 +69,8 @@ class Model:
         self._split = None
         self._X = X
         self._y = y
+        self._X_train = None
+        self._y_train = None
         self._X_test = None
         self._y_test = None
         # frontend Widgets associated with this model.
@@ -147,6 +149,22 @@ class Model:
     @y_test.setter
     def y_test(self, new_value):
         self._y_test = new_value
+
+    @property
+    def X_train(self):
+        return self._X_train
+
+    @X_train.setter
+    def X_train(self, new_value):
+        self._X_train = new_value
+
+    @property
+    def y_train(self):
+        return self._y_train
+
+    @y_train.setter
+    def y_train(self, new_value):
+        self._y_train = new_value
 
     @property
     def remove_features_sm(self):
