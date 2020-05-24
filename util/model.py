@@ -1,5 +1,6 @@
 import enum
 import pandas as pd
+import logging as log
 from sklearn.pipeline import Pipeline
 
 
@@ -73,6 +74,12 @@ class Model:
         self._y_train = None
         self._X_test = None
         self._y_test = None
+        self._shap_values = None
+        self._skater_interpreter = None
+        self._skater_model = None
+        self._X_train_ohe = None
+        self._X_test_ohe = None
+        self._features_ohe = None
         # frontend Widgets associated with this model.
         # sm -> Select Multiple, dd -> Drop Down, ...
         self._remove_features_sm = None
@@ -165,6 +172,88 @@ class Model:
     @y_train.setter
     def y_train(self, new_value):
         self._y_train = new_value
+
+    @property
+    def shap_values(self):
+        return self._shap_values
+
+    @shap_values.setter
+    def shap_values(self, new_value):
+        self._shap_values = new_value
+
+    def init_shap(self):
+        """
+        Initialize shap. Calculate shap values. This operation is time consuming.
+        :return: void (Sets the value of the shap_values variable)
+        """
+        from . commons import shap
+
+        logger = log.getLogger('shap')
+        logger.setLevel(log.WARN)
+
+        shap_kernel_explainer = shap.KernelExplainer(self.model[1].predict_proba,
+                                                     shap.kmeans(self.X_test_ohe, 1))
+        shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe)
+
+        self.shap_values = shap_values
+
+    @property
+    def skater_interpreter(self):
+        return self._skater_interpreter
+
+    @skater_interpreter.setter
+    def skater_interpreter(self, new_value):
+        self._skater_interpreter = new_value
+
+    @property
+    def skater_model(self):
+        return self._skater_model
+
+    @skater_model.setter
+    def skater_model(self, new_value):
+        self._skater_model = new_value
+
+    def init_skater(self, target_names=None):
+        """
+        Initialize skater. Set ups skater interpreter and in-memory model.
+        :return: void (Sets the values of the skater_interpreter and skater_model variables)
+        """
+        from . commons import Interpretation
+        from . commons import InMemoryModel
+
+        self.skater_interpreter = Interpretation(
+            training_data=self.X_train_ohe,
+            training_labels=self.y_train,
+            feature_names=self.features_ohe)
+
+        self.skater_model = InMemoryModel(
+            self.model[1].predict_proba,
+            examples=self.X_test_ohe,
+            target_names=target_names)
+
+    @property
+    def X_train_ohe(self):
+        return self._X_train_ohe
+
+    @X_train_ohe.setter
+    def X_train_ohe(self, new_value):
+        self._X_train_ohe = new_value
+
+    @property
+    def X_test_ohe(self):
+        return self._X_test_ohe
+
+    @X_test_ohe.setter
+    def X_test_ohe(self, new_value):
+        self._X_test_ohe = new_value
+
+    @property
+    def features_ohe(self):
+        return self._features_ohe
+
+    @features_ohe.setter
+    def features_ohe(self, new_value):
+        self._features_ohe = new_value
 
     @property
     def remove_features_sm(self):
