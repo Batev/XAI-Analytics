@@ -5,6 +5,7 @@ import eli5
 import xai
 import logging as log
 import shap
+import enum
 
 from matplotlib import figure, axes
 from lime.lime_tabular import LimeTabularExplainer
@@ -46,6 +47,18 @@ log.getLogger().setLevel(log.INFO)
 
 # Remove DataFrame display limitation
 pd.set_option('display.max_columns', 50)
+
+
+class FeatureImportanceType(enum.Enum):
+    ELI5 = 1
+    SKATER = 2
+    SHAP = 3
+
+
+class PDPType(enum.Enum):
+    PDPBox = 1
+    SKATER = 2
+    SHAP = 3
 
 
 def explain_single_instance(classifier: Pipeline,
@@ -316,6 +329,58 @@ def calculate_X_ohe(model: Pipeline, X: pd.DataFrame):
     # model.model[0] to get the preprocessor from the pipeline
     X_test_ohe = model[0].fit_transform(X)
     return pd.DataFrame(X_test_ohe.toarray(), columns=feature_names), feature_names
+
+
+def generate_feature_importance_plot(type: str, model: Model) -> IPython.display.HTML:
+    """
+    Generate feature importance plot for a model.
+    :param type: Type of feature importance method to be used.
+    :param model: Model, for which a plot should be created.
+    :return: If type is ELI5, then IPython.display.HTML plot
+    is returned, None otherwise
+    """
+    plot = None
+    log.info("Generating a feature importance plot using {} for {} ...".format(type, model.name))
+
+    if FeatureImportanceType[type] == FeatureImportanceType.ELI5:
+        plot = plot_feature_importance_with_eli5(model)
+    elif FeatureImportanceType[type] == FeatureImportanceType.SKATER:
+        model.init_skater()
+        plot_feature_importance_with_skater(model)
+    elif FeatureImportanceType[type] == FeatureImportanceType.SHAP:
+        model.init_shap()
+        plot_feature_importance_with_shap(model)
+    else:
+        log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+
+    return plot
+
+
+def generate_pdp_plots(type: str, model: Model, feature1: str, feature2: str):
+    plot = None
+
+    log.info("Generating a PDP plot using {} for {} ...".format(type, model.name))
+    if PDPType[type] == PDPType.PDPBox:
+        if feature2 == 'None':
+            plot_single_pdp_with_pdpbox(model, feature1)
+        else:
+            plot_multi_pdp_with_pdpbox(model, feature1, feature2)
+    elif PDPType[type] == PDPType.SKATER:
+        model.init_skater()
+        if feature2 == 'None':
+            plot_single_pdp_with_skater(model, feature1)
+        else:
+            plot_multi_pdp_with_skater(model, feature1, feature2)
+    elif PDPType[type] == PDPType.SHAP:
+        model.init_shap()
+        if feature2 == 'None':
+            plot_single_pdp_with_shap(model, feature1)
+        else:
+            plot_multi_pdp_with_shap(model, feature1, feature2)
+    else:
+        log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+
+    return plot
 
 
 def plot_single_pdp_with_pdpbox(model: Model, feature: str, plot_lines=True,
@@ -654,10 +719,24 @@ def get_model_by_id(models: list, id: int) -> Model:
             model = m
 
     if model is None:
-        log.error("No model found with ID ''.".format(id))
+        log.error("No model found with ID '{}'.".format(id))
         return model
     else:
         return model
+
+
+def get_models_by_names(models: list, names: list) -> list:
+    sub_models = []
+    for name in names:
+        for model in models:
+            if model.name == name:
+                sub_models.append(model)
+
+    if not models:
+        log.error("No models found with names in {}''.".format(names))
+        return sub_models
+    else:
+        return sub_models
 
 
 def get_model_by_remove_features_button(models: list, button: widgets.Widget) -> Model:
@@ -694,3 +773,33 @@ def get_model_by_split_type_dd(models: list, dropdown: widgets.Widget) -> Model:
         return model
     else:
         return model
+
+def get_child_value_by_description(gridbox: widgets.GridBox, description: str, number: int):
+    child = _get_child_by_description(gridbox, description)[number]
+    if child is None:
+        log.error("No element with description {} found!".format(description))
+        return
+
+    if isinstance(child, widgets.SelectMultiple):
+        child_value = list(child.value)
+    elif isinstance(child, widgets.Select):
+        child_value = str(child.value)
+    else:
+        log.error("Type {} is not yet supported. Please extend this function in order to support it."
+                  .format(type(child)))
+        return
+
+    if not child_value:
+        log.warning("No {} were selected. Please select at least one type and try again!".format(description))
+        return
+
+    return child_value
+
+
+def _get_child_by_description(gridbox: widgets.GridBox, description: str) -> list:
+    selects = []
+    for child in gridbox.children:
+        if child.description == description:
+            selects.append(child)
+
+    return selects

@@ -1,5 +1,7 @@
+import logging as log
+
 from ipywidgets import widgets, Layout, ButtonStyle, Label, GridBox, Button, HBox
-from util.commons import get_model_by_id
+from util.commons import get_model_by_id, FeatureImportanceType, PDPType
 from util.split import SplitTypes
 
 
@@ -210,26 +212,113 @@ def generate_reset_strip_hbox(on_click_reset_button):
                            grid_gap='3px 3px'))
 
 
-def generate_global_interpretation_grid(models: list) -> HBox:
-    length = len(models)
+def generate_feature_importance_grid(models: list) -> GridBox:
     children = []
-    min_number = 3
 
     # Row 1
-    for m in models:
-        children.append(
-            Label(layout=Layout(width='auto', height='auto'), value='Global explanation for {}'.format(m.name)))
-    # Row 1: add dummy widgets
-    add_dummy_widgets(min_number, children, min_number)
+    children.append(
+        Label(layout=Layout(width='auto', height='auto'), value='Choose a feature importance method'))
+    children.append(
+        Label(layout=Layout(width='auto', height='auto'), value='Choose one or more model(s)'))
 
-    return HBox(children=children,
-                layout=Layout(
+    # Row 2
+    # if you change the description of this widget,
+    # you have to also adjust it in the notebook function call.
+    children.append(
+        widgets.Select(
+            description='Type',
+            options=[elem.name for elem in FeatureImportanceType],
+            disabled=False)
+    )
+    # if you change the description of this widget,
+    # you have to also adjust it in the notebook function call.
+    children.append(
+        widgets.SelectMultiple(
+            description='Model(s)',
+            options=[model.name for model in models],
+            disabled=False)
+    )
+
+    return GridBox(children=children,
+                   layout=Layout(
                            width='auto',
                            grid_template_columns="50% 50%",
-                           align_items='center',
-                           # grid_template_columns='auto auto auto',
                            grid_template_rows='auto',
+                           align_items='center',
                            grid_gap='3px 3px'))
+
+
+def generate_pdp_grid(models: list) -> GridBox:
+        children = []
+
+        # Row 1
+        children.append(
+            Label(layout=Layout(width='auto', height='auto'), value='Choose a PDP method'))
+        children.append(
+            Label(layout=Layout(width='auto', height='auto'), value='Choose one or more model(s)'))
+
+        # Row 2
+        # if you change the description of this widget,
+        # you have to also adjust it in the notebook function call.
+        children.append(
+            widgets.Select(
+                description='Type',
+                options=[elem.name for elem in PDPType],
+                disabled=False)
+        )
+        # if you change the description of this widget,
+        # you have to also adjust it in the notebook function call.
+        children.append(
+            widgets.SelectMultiple(
+                description='Model(s)',
+                options=[model.name for model in models],
+                disabled=False)
+        )
+
+        return GridBox(children=children,
+                       layout=Layout(
+                           width='auto',
+                           grid_template_columns="50% 50%",
+                           grid_template_rows='auto',
+                           align_items='center',
+                           grid_gap='3px 3px'))
+
+
+def generate_pdp_feature_selection_grid(models: list) -> GridBox:
+    children = []
+
+    # Row 1
+    children.append(
+        Label(layout=Layout(width='auto', height='auto'), value='Feature 1 for ...'))
+    children.append(
+        Label(layout=Layout(width='auto', height='auto'), value='(optional) Feature 2 for ...'))
+
+    for model in models:
+        # Row 2 -> Row (2 + len(models))
+        # if you change the description of this widget,
+        # you have to also adjust it in the notebook function call.
+        features = model.features_ohe.copy()
+        features.insert(0, 'None')
+
+        children.append(
+            widgets.Select(
+                description="... " + model.name,
+                options=model.features_ohe,
+                disabled=False))
+        children.append(
+            widgets.Select(
+                description="... " + model.name,
+                options=features,
+                value='None',
+                disabled=False))
+
+    return GridBox(children=children,
+                   layout=Layout(
+                       width='auto',
+                       grid_template_columns="50% 50%",
+                       grid_template_rows='auto',
+                       align_items='center',
+                       grid_gap='3px 3px'))
 
 
 def get_reset_strip_hbox_label(hbox: HBox) -> Label:
