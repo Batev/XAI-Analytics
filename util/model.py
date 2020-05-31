@@ -186,16 +186,22 @@ class Model:
         Initialize shap. Calculate shap values. This operation is time consuming.
         :return: void (Sets the value of the shap_values variable)
         """
-        from . commons import shap
+        if not self.shap_values:
+            from . commons import shap
 
-        logger = log.getLogger('shap')
-        logger.setLevel(log.WARN)
+            log.info("Initializing Shap - calculating shap values."
+                     " This operation is time-consuming so please be patient.")
 
-        shap_kernel_explainer = shap.KernelExplainer(self.model[1].predict_proba,
-                                                     shap.kmeans(self.X_test_ohe, 1))
-        shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe)
+            logger = log.getLogger('shap')
+            logger.setLevel(log.WARN)
 
-        self.shap_values = shap_values
+            shap_kernel_explainer = shap.KernelExplainer(self.model[1].predict_proba,
+                                                         shap.kmeans(self.X_test_ohe, 1))
+            shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe)
+
+            self.shap_values = shap_values
+        else:
+            log.info("Shap is already initialized.")
 
     @property
     def skater_interpreter(self):
@@ -218,18 +224,24 @@ class Model:
         Initialize skater. Set ups skater interpreter and in-memory model.
         :return: void (Sets the values of the skater_interpreter and skater_model variables)
         """
-        from . commons import Interpretation
-        from . commons import InMemoryModel
+        if not self.skater_interpreter or not self.skater_model:
+            from . commons import Interpretation
+            from . commons import InMemoryModel
 
-        self.skater_interpreter = Interpretation(
-            training_data=self.X_train_ohe,
-            training_labels=self.y_train,
-            feature_names=self.features_ohe)
+            log.info("Initializing Skater - generating new in-memory model."
+                     " This operation may be time-consuming so please be patient.")
 
-        self.skater_model = InMemoryModel(
-            self.model[1].predict_proba,
-            examples=self.X_test_ohe,
-            target_names=target_names)
+            self.skater_interpreter = Interpretation(
+                training_data=self.X_train_ohe,
+                training_labels=self.y_train,
+                feature_names=self.features_ohe)
+
+            self.skater_model = InMemoryModel(
+                self.model[1].predict_proba,
+                examples=self.X_test_ohe,
+                target_names=target_names)
+        else:
+            log.info("Skater is already initialized.")
 
     @property
     def X_train_ohe(self):
