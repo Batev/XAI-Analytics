@@ -1,6 +1,7 @@
 import enum
 import pandas as pd
 import logging as log
+
 from sklearn.pipeline import Pipeline
 
 
@@ -74,11 +75,18 @@ class Model:
         self._y_train = None
         self._X_test = None
         self._y_test = None
+        self._predictions = None
+        self.shap_kernel_explainer = None
         self._shap_values = None
         self._skater_interpreter = None
         self._skater_model = None
+        self._lime_explainer = None
         self._X_train_ohe = None
         self._X_test_ohe = None
+        self._numerical_features = None
+        self._categorical_features = None
+        self._categorical_ohe_features = None
+        self._idx2ohe = None
         self._features_ohe = None
         # frontend Widgets associated with this model.
         # sm -> Select Multiple, dd -> Drop Down, ...
@@ -173,6 +181,16 @@ class Model:
     def y_train(self, new_value):
         self._y_train = new_value
 
+
+    @property
+    def predictions(self):
+        return self._predictions
+
+    @predictions.setter
+    def predictions(self, new_value):
+        self._predictions = new_value
+
+
     @property
     def shap_values(self):
         return self._shap_values
@@ -181,13 +199,22 @@ class Model:
     def shap_values(self, new_value):
         self._shap_values = new_value
 
+    @property
+    def shap_kernel_explainer(self):
+        return self._shap_kernel_explainer
+
+    @shap_kernel_explainer.setter
+    def shap_kernel_explainer(self, new_value):
+        self._shap_kernel_explainer = new_value
+
     def init_shap(self):
         """
         Initialize shap. Calculate shap values. This operation is time consuming.
         :return: void (Sets the value of the shap_values variable)
         """
+        import shap
+
         if not self.shap_values:
-            from . commons import shap
 
             log.info("Initializing Shap - calculating shap values."
                      " This operation is time-consuming so please be patient.")
@@ -198,7 +225,10 @@ class Model:
             shap_kernel_explainer = shap.KernelExplainer(self.model[1].predict_proba,
                                                          shap.kmeans(self.X_test_ohe, 1))
             shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe)
+            # from util.commons import RANDOM_NUMBER
+            # shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe.sample(66, random_state=RANDOM_NUMBER))
 
+            self.shap_kernel_explainer = shap_kernel_explainer
             self.shap_values = shap_values
         else:
             log.info("Shap is already initialized.")
@@ -224,9 +254,10 @@ class Model:
         Initialize skater. Set ups skater interpreter and in-memory model.
         :return: void (Sets the values of the skater_interpreter and skater_model variables)
         """
+        from skater.core.explanations import Interpretation
+        from skater.model import InMemoryModel
+
         if not self.skater_interpreter or not self.skater_model:
-            from . commons import Interpretation
-            from . commons import InMemoryModel
 
             log.info("Initializing Skater - generating new in-memory model."
                      " This operation may be time-consuming so please be patient.")
@@ -242,6 +273,45 @@ class Model:
                 target_names=target_names)
         else:
             log.info("Skater is already initialized.")
+
+    def init_lime(self):
+        """
+        Initializes a LIME explainer that can later be used for local interpretations
+        for this model.
+        :return: void (Sets the value for lime_explainer)
+        """
+        from lime.lime_tabular import LimeTabularExplainer
+        from util.commons import RANDOM_NUMBER, convert_to_lime_format
+
+        if not self.lime_explainer:
+
+            log.info("Initializing LIME - generating new explainer."
+                     " This operation may be time-consuming so please be patient.")
+
+            # Transform the categorical feature's labels to a lime-readable format.
+            categorical_names = self.idx2ohe
+            log.debug("Categorical names for lime: {}".format(categorical_names))
+
+            explainer = LimeTabularExplainer(
+                convert_to_lime_format(self.X_test, categorical_names).values,
+                mode="classification",
+                feature_names=self.X_test.columns.tolist(),
+                categorical_names=categorical_names,
+                categorical_features=categorical_names.keys(),
+                discretize_continuous=True,
+                random_state=RANDOM_NUMBER)
+
+            self.lime_explainer = explainer
+        else:
+            log.info("LIME is already initialized.")
+
+    @property
+    def lime_explainer(self):
+        return self._lime_explainer
+
+    @lime_explainer.setter
+    def lime_explainer(self, new_value):
+        self._lime_explainer = new_value
 
     @property
     def X_train_ohe(self):
@@ -266,6 +336,38 @@ class Model:
     @features_ohe.setter
     def features_ohe(self, new_value):
         self._features_ohe = new_value
+
+    @property
+    def numerical_features(self):
+        return self._numerical_features
+
+    @numerical_features.setter
+    def numerical_features(self, new_value):
+        self._numerical_features = new_value
+
+    @property
+    def categorical_features(self):
+        return self._categorical_features
+
+    @categorical_features.setter
+    def categorical_features(self, new_value):
+        self._categorical_features = new_value
+
+    @property
+    def categorical_ohe_features(self):
+        return self._categorical_ohe_features
+
+    @categorical_ohe_features.setter
+    def categorical_ohe_features(self, new_value):
+        self._categorical_ohe_features = new_value
+
+    @property
+    def idx2ohe(self):
+        return self._idx2ohe
+
+    @idx2ohe.setter
+    def idx2ohe(self, new_value):
+        self._idx2ohe = new_value
 
     @property
     def remove_features_sm(self):

@@ -6,9 +6,9 @@ import xai
 import logging as log
 import shap
 import enum
+import random
 
 from matplotlib import figure, axes
-from lime.lime_tabular import LimeTabularExplainer
 from functools import partial
 from ipywidgets import widgets
 from sklearn.compose import ColumnTransformer
@@ -24,8 +24,6 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from xgboost import XGBClassifier
 from pandas.api.types import is_numeric_dtype, is_string_dtype
 from multipledispatch import dispatch
-from skater.core.explanations import Interpretation
-from skater.model import InMemoryModel
 from pdpbox import pdp
 
 from util.dataset import Datasets, Dataset
@@ -61,87 +59,18 @@ class PDPType(enum.Enum):
     SHAP = 3
 
 
-def explain_single_instance(classifier: Pipeline,
-                            X_test: pd.DataFrame,
-                            y_test: pd.Series,
-                            example: int):
-
-    num_features, cat_features = divide_features(X_test)
-    new_ohe_features = get_ohe_cats(classifier, cat_features)
-
-    # Transform the categorical feature's labels to a lime-readable format.
-    categorical_names = {}
-    for col in cat_features:
-        categorical_names[X_test.columns.get_loc(col)] = [new_col.split("__")[1]
-                                                          for new_col in new_ohe_features
-                                                          if new_col.split("__")[0] == col]
-
-    def custom_predict_proba(X, model):
-        """
-        Create a custom predict_proba for the model, so that it could be used in lime.
-        :param X: Example to be classified.
-        :param model: The model - classifier.
-        :return: The probability that X will be classified as 1.
-        """
-        X_str = convert_to_lime_format(X, categorical_names, col_names=X_test.columns, invert=True)
-        return model.predict_proba(X_str)
+class LocalInterpreterType(enum.Enum):
+    LIME = 1
+    SHAP = 2
 
 
-    # log.debug("Categorical names for lime: {}".format(categorical_names))
-
-    explainer = LimeTabularExplainer(convert_to_lime_format(X_test, categorical_names).values,
-                                     mode="classification",
-                                     feature_names=X_test.columns.tolist(),
-                                     categorical_names=categorical_names,
-                                     categorical_features=categorical_names.keys(),
-                                     discretize_continuous=True,
-                                     random_state=RANDOM_NUMBER)
-
-    log.info("Example {}'s data: \n{}".format(example, X_test.iloc[example]))
-    log.info("Example {}'s actual result: {}".format(example, y_test[example]))
-
-    custom_model_predict_proba = partial(custom_predict_proba, model=classifier)
-    observation = convert_to_lime_format(X_test.iloc[[example], :], categorical_names).values[0]
-    explanation = explainer.explain_instance(observation,
-                                             custom_model_predict_proba,
-                                             num_features=len(num_features))
-
-    return explanation
+class ExampleType(enum.Enum):
+    RANDOM = 1
+    FALSELY_CLASSIFIED = 2
+    TRULY_CLASSIFIED = 3
 
 
-def convert_to_lime_format(X, categorical_names, col_names=None, invert=False):
-    """Converts data with categorical values as string into the right format
-    for LIME, with categorical values as integers labels.
-    It takes categorical_names, the same dictionary that has to be passed
-    to LIME to ensure consistency.
-    col_names and invert allow to rebuild the original dataFrame from
-    a numpy array in LIME format to be passed to a Pipeline or sklearn
-    OneHotEncoder
-    """
-
-    # If the data isn't a dataframe, we need to be able to build it
-    if not isinstance(X, pd.DataFrame):
-        X_lime = pd.DataFrame(X, columns=col_names)
-    else:
-        X_lime = X.copy()
-
-    for k, v in categorical_names.items():
-        if not invert:
-            label_map = {
-                str_label: int_label for int_label, str_label in enumerate(v)
-            }
-
-        else:
-            label_map = {
-                int_label: str_label for int_label, str_label in enumerate(v)
-            }
-
-        X_lime.iloc[:, k] = X_lime.iloc[:, k].map(label_map)
-
-    return X_lime
-
-
-def divide_features(df: pd.DataFrame) -> (list, list):
+def _divide_features(df: pd.DataFrame) -> (list, list):
     """
     Separate the numerical from the non-numerical columns of a pandas.DataFrame.
     :param df: The pandas.DataFrame to be separated.
@@ -224,7 +153,7 @@ def get_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Ser
         raise NotImplementedError
 
 
-def get_ohe_cats(model: Pipeline, cat_features: list) -> list:
+def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
     """
     Gets all encoded (with OneHotEncoder) features for a model.
     :param model: Pipeline for the model.
@@ -240,14 +169,10 @@ def get_ohe_cats(model: Pipeline, cat_features: list) -> list:
     return new_ohe_features
 
 
-def get_all_features(model: Pipeline, num_features: list, cat_features: list) -> list:
-    return num_features + get_ohe_cats(model, cat_features)
-
-
 def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: pd.Series) -> \
         (Pipeline, pd.DataFrame, pd.Series):
 
-    num_features, cat_features = divide_features(df_x)
+    num_features, cat_features = _divide_features(df_x)
 
     log.debug("Numerical features: {}".format(num_features))
     log.debug("Categorical features: {}".format(cat_features))
@@ -284,11 +209,7 @@ def plot_feature_importance_with_eli5(model: Model) -> IPython.display.HTML:
     :param model: The model to be interpreted.
     :return: IPython.display.HTML element with the feature importance.
     """
-    num_features, cat_features = divide_features(model.X)
-    return eli5.show_weights(model.model.named_steps["model"],
-                             feature_names=get_all_features(model.model,
-                                                            num_features,
-                                                            cat_features))
+    return eli5.show_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
 
 
 def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Axes):
@@ -297,12 +218,8 @@ def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Ax
     :param model: The model to be interpreted.
     :return: (f, ax): (figure instance, matplotlib.axes._subplots.AxesSubplot)
     """
-    num_features, cat_features = divide_features(model.X)
-    interpreter = Interpretation(training_data=model.X_train, training_labels=model.y_train,
-                                 feature_names=list(num_features + cat_features))
-    im_model = InMemoryModel(model.model.predict_proba, examples=model.X_test,
-                             target_names=['$50K or less', 'More than $50K'])
-    f, ax = interpreter.feature_importance.plot_feature_importance(im_model, ascending=True)
+
+    f, ax = model.skater_interpreter.feature_importance.plot_feature_importance(model._skater_model, ascending=True)
     return f, ax
 
 
@@ -316,19 +233,17 @@ def plot_feature_importance_with_shap(model: Model, plot_type="bar"):
     shap.summary_plot(model.shap_values, model.X_test_ohe, plot_type=plot_type)
 
 
-def calculate_X_ohe(model: Pipeline, X: pd.DataFrame):
+def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
     """
     Transform a pd.DataFrame using a One-Hot Encoder from a suitable Pipeline.
     :param model: OHE from a Pipeline to be used
     :param X: X to be encoded
-    :return: (One-Hot encoded pd.DataFrame, All One-Hot encoded columns)
+    :return: One-Hot encoded pd.DataFrame
     """
-    num_features, cat_features = divide_features(X)
-    feature_names = get_all_features(model, num_features, cat_features)
 
     # model.model[0] to get the preprocessor from the pipeline
     X_test_ohe = model[0].fit_transform(X)
-    return pd.DataFrame(X_test_ohe.toarray(), columns=feature_names), feature_names
+    return pd.DataFrame(X_test_ohe.toarray(), columns=feature_names)
 
 
 def generate_feature_importance_plot(type: str, model: Model) -> IPython.display.HTML:
@@ -345,10 +260,12 @@ def generate_feature_importance_plot(type: str, model: Model) -> IPython.display
     if FeatureImportanceType[type] == FeatureImportanceType.ELI5:
         plot = plot_feature_importance_with_eli5(model)
     elif FeatureImportanceType[type] == FeatureImportanceType.SKATER:
-        model.init_skater()
+        if not model.skater_model or not model.skater_interpreter:
+            model.init_skater()
         plot_feature_importance_with_skater(model)
     elif FeatureImportanceType[type] == FeatureImportanceType.SHAP:
-        model.init_shap()
+        if not model.shap_values:
+            model.init_shap()
         plot_feature_importance_with_shap(model)
     else:
         log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
@@ -366,13 +283,15 @@ def generate_pdp_plots(type: str, model: Model, feature1: str, feature2: str):
         else:
             plot_multi_pdp_with_pdpbox(model, feature1, feature2)
     elif PDPType[type] == PDPType.SKATER:
-        model.init_skater()
+        if not model.skater_model or not model.skater_interpreter:
+            model.init_skater()
         if feature2 == 'None':
             plot_single_pdp_with_skater(model, feature1)
         else:
             plot_multi_pdp_with_skater(model, feature1, feature2)
     elif PDPType[type] == PDPType.SHAP:
-        model.init_shap()
+        if not model.shap_values:
+            model.init_shap()
         if feature2 == 'None':
             plot_single_pdp_with_shap(model, feature1)
         else:
@@ -459,6 +378,7 @@ def plot_single_pdp_with_shap(model: Model, feature: str):
                          interaction_index=feature,
                          shap_values=model.shap_values[0],
                          features=model.X_test_ohe)
+                         # features=model.X_test_ohe.sample(66, random_state=RANDOM_NUMBER))
 
 
 def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto'):
@@ -475,6 +395,7 @@ def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto'):
                          interaction_index=feature2,
                          shap_values=model.shap_values[0],
                          features=model.X_test_ohe)
+                         # features=model.X_test_ohe.sample(66, random_state=RANDOM_NUMBER))
 
 
 def plot_single_pdp_with_skater(model: Model, feature: str, n_samples=1000, grid_resolution=50, grid_range=(0, 1),
@@ -501,6 +422,180 @@ def plot_multi_pdp_with_skater(model: Model, feature1: str, feature2: str, n_sam
                                                                             with_variance=with_variance,
                                                                             figsize=figsize)
     return r
+
+
+def generate_idx2ohe_dict(X: pd.DataFrame, cat_features: list, ohe_cat_features: list):
+    """
+    All categorical features - getting their index to use as a key and then
+    listing all possible values for that feature.
+    We get the possible values from the attribute categories of our one hot encoder.
+    :param X: Test DataFrame for getting the right column index
+    :param cat_features: All the original categorical columns
+    :param ohe_cat_features: All the One-Hot encoded columns
+    :return: A dict mapping original column index to all of its possible values
+    """
+    categorical_names = {}
+
+    for col in cat_features:
+        categorical_names[X.columns.get_loc(col)] = \
+            [new_col.split("_")[1]
+             for new_col in ohe_cat_features
+             if new_col.split("_")[0] == col]
+
+    return categorical_names.copy()
+
+
+def explain_single_instance(model: Model, local_interpreter: LocalInterpreterType, example: int):
+    """
+    Explain single instance (example) with a given interpreter type.
+    :param model: The model for which an instance should be explained
+    :param local_interpreter: Type of interpreter to be used. Currently only LIME and SHAP are supported
+    :param example: The example to be explained - The row number from the X_test pd.DataFrame
+    :return: An explanation
+    """
+    explanation = None
+
+    log.info("Explanation for {}.".format(model.name))
+    log.info("Example {}'s data: \n{}".format(example, model.X_test.iloc[example]))
+    log.info("Model prediction for example {}: {}".format(example, model.predictions[example]))
+    log.info("Actual result for example {}: {} \n".format(example, model.y_test.iloc[example]))
+
+    if local_interpreter is LocalInterpreterType.LIME:
+        if not model.lime_explainer:
+            model.init_lime()
+        explanation = explain_single_instance_with_lime(model, example)
+    elif local_interpreter is LocalInterpreterType.SHAP:
+        if not model.shap_values:
+            model.init_shap()
+        explanation = explain_single_instance_with_shap(model, example)
+    else:
+        log.error("Interpreter type {} is not yet supported for local interpretations. Please either use another one"
+                  "or extend the functionality of this function".format(local_interpreter))
+
+    return explanation
+
+
+def convert_to_lime_format(X, categorical_names, col_names=None, invert=False):
+    """
+    Converts data with categorical values as string into the right format
+    for LIME, with categorical values as integers labels.
+    It takes categorical_names, the same dictionary that has to be passed
+    to LIME to ensure consistency.
+    col_names and invert allow to rebuild the original dataFrame from
+    a numpy array in LIME format to be passed to a Pipeline or sklearn
+    OneHotEncoder
+    :param X: The data to be converted
+    :param categorical_names: The names of the categorical ohe features
+    :param col_names: Names of all initial columns
+    :param invert: If we want to rebuild the original DataFrame
+    :return: LIME format DataFrame / (If invert) Initial DataFrame
+    """
+
+    # If the data isn't a dataframe, we need to be able to build it
+    if not isinstance(X, pd.DataFrame):
+        X_lime = pd.DataFrame(X, columns=col_names)
+    else:
+        X_lime = X.copy()
+
+    for k, v in categorical_names.items():
+        if not invert:
+            label_map = {
+                str_label: int_label for int_label, str_label in enumerate(v)
+            }
+
+        else:
+            label_map = {
+                int_label: str_label for int_label, str_label in enumerate(v)
+            }
+
+        X_lime.iloc[:, k] = X_lime.iloc[:, k].map(label_map)
+
+    return X_lime
+
+
+def explain_single_instance_with_lime(model: Model, example: int):
+    """
+    Explain single instance with LIME from the test dataset.
+    :param model: Model, which should be explained
+    :param example: Position of the example from the test dataset, that has to be explained
+    :return:
+    """
+
+    all_cols = model.X_test.columns
+    idx2ohe = model.idx2ohe
+
+    def custom_predict_proba(X, model):
+        """
+        Create a custom predict_proba for the model, so that it could be used in lime.
+        :param X: Example to be classified.
+        :param model: The model - classifier.
+        :return: The probability that X will be classified as 1.
+        """
+        X_str = convert_to_lime_format(X, idx2ohe, col_names=all_cols, invert=True)
+        return model.predict_proba(X_str)
+
+    custom_model_predict_proba = partial(custom_predict_proba, model=model.model)
+    observation = convert_to_lime_format(model.X_test.iloc[[example], :], model.idx2ohe).values[0]
+    explanation = model.lime_explainer.explain_instance(
+        observation,
+        custom_model_predict_proba,
+        num_features=len(model.numerical_features))
+
+    return explanation
+
+
+def explain_single_instance_with_shap(model: Model, example: int, expected_value_idx=0):
+    """
+    Explain single instance with SHAP.
+    :param model: The model, for which an explanation should be generated
+    :param example: Example number to be explained
+    :param expected_value_idx: The index of the shap expected_value list
+    :return: A plot for the explanation.
+    """
+
+    return shap.force_plot(
+        model.shap_kernel_explainer.expected_value[expected_value_idx],
+        model.shap_values[0][example, :],
+        model.X_test_ohe.iloc[example, :])
+
+
+def get_test_examples(model: Model, examples_type: ExampleType, number_of_examples: int) -> list:
+    """
+    Extracts a subset with row numbers from the X_test pd.DataFrame depending on the example type
+    that is needed.
+    :param model: The model for which examples should be collected
+    :param examples_type: The type of examples to be extracted
+    :param number_of_examples: Number of example numbers to be extracted
+    :return: List containing the row numbers of the extracted examples. Later these numbers should be used for
+    explaining a single instance of the test set.
+    """
+    examples = []
+    indexes = None
+
+    if number_of_examples > 0:
+        if examples_type is ExampleType.RANDOM:
+            indexes = random.choices(model.X_test.index.tolist(), k=number_of_examples)
+        else:
+            X_output = model.X_test.copy()
+            X_output.loc[:, 'predict'] = model.model.predict(X_output)
+            X_output['result'] = model.y_test.values
+            if examples_type is ExampleType.TRULY_CLASSIFIED:
+                truly_classified = X_output.loc[(X_output['predict'] == X_output['result'])].index.tolist()
+                indexes = random.choices(truly_classified, k=number_of_examples)
+            elif examples_type is ExampleType.FALSELY_CLASSIFIED:
+                falsely_classified = X_output.loc[(X_output['predict'] != X_output['result'])].index.tolist()
+                indexes = random.choices(falsely_classified, k=number_of_examples)
+            else:
+                log.error("Example(s) type: {} is not yet supported for this function. Please either use another type"
+                          "or extend the functionality.".format(examples_type.name))
+    else:
+        log.error("The number of examples should be greater than 0: {}".format(number_of_examples))
+
+    # Post-processing: Get the location of the examples by their indexes in the test pd.DataFrame
+    for i in range(number_of_examples):
+        examples.append(model.X_test.index.get_loc(indexes[i]))
+
+    return examples
 
 
 @dispatch(str)
@@ -688,8 +783,13 @@ def fill_model(model: Model) -> str:
     model.X_test = X_test
     model.y_test = y_test
     # required later for global model interpretations
-    model.X_train_ohe, _ = calculate_X_ohe(model_pipeline, X_train)
-    model.X_test_ohe, model.features_ohe = calculate_X_ohe(model_pipeline, X_test)
+    model.numerical_features, model.categorical_features = _divide_features(X_test)
+    model.categorical_ohe_features = _get_categorical_ohe_features(model_pipeline, model.categorical_features)
+    model.features_ohe = model.numerical_features + model.categorical_ohe_features
+    model.idx2ohe = generate_idx2ohe_dict(X_test, model.categorical_features, model.features_ohe)
+    model.X_train_ohe = calculate_X_ohe(model_pipeline, X_train, model.features_ohe)
+    model.X_test_ohe = calculate_X_ohe(model_pipeline, X_test, model.features_ohe)
+    model.predictions = model.model.predict(model.X_test)
 
     msg = "Model {} trained successfully!".format(model.name)
     log.info(msg)
@@ -774,6 +874,7 @@ def get_model_by_split_type_dd(models: list, dropdown: widgets.Widget) -> Model:
     else:
         return model
 
+
 def get_child_value_by_description(gridbox: widgets.GridBox, description: str, number: int):
     child = _get_child_by_description(gridbox, description)[number]
     if child is None:
@@ -782,8 +883,10 @@ def get_child_value_by_description(gridbox: widgets.GridBox, description: str, n
 
     if isinstance(child, widgets.SelectMultiple):
         child_value = list(child.value)
-    elif isinstance(child, widgets.Select):
+    elif isinstance(child, widgets.Select) or isinstance(child, widgets.RadioButtons):
         child_value = str(child.value)
+    elif isinstance(child, widgets.IntSlider):
+        child_value = child.value
     else:
         log.error("Type {} is not yet supported. Please extend this function in order to support it."
                   .format(type(child)))
