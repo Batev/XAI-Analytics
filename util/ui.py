@@ -1,7 +1,7 @@
 import logging as log
 
 from ipywidgets import widgets, Layout, ButtonStyle, Label, GridBox, Button, HBox
-from util.commons import get_model_by_id, FeatureImportanceType, PDPType
+from util.commons import get_model_by_id, FeatureImportanceType, PDPType, LocalInterpreterType, ExampleType
 from util.split import SplitTypes
 
 
@@ -311,6 +311,71 @@ def generate_pdp_feature_selection_grid(models: list) -> GridBox:
                 options=features,
                 value='None',
                 disabled=False))
+
+    return GridBox(children=children,
+                   layout=Layout(
+                       width='auto',
+                       grid_template_columns="50% 50%",
+                       grid_template_rows='auto',
+                       align_items='center',
+                       grid_gap='3px 3px'))
+
+
+def generate_local_interpretation_grid(models: list) -> GridBox:
+    children = []
+
+    # Row 1
+    children.append(
+        Label(layout=Layout(width='auto', height='auto'), value='Choose an interpretation method'))
+    children.append(
+        Label(layout=Layout(width='auto', height='auto'), value='Choose one or more model(s)'))
+
+    # Row 2
+    # if you change the description of this widget,
+    # you have to also adjust it in the notebook function call.
+    children.append(
+        widgets.Select(
+            description='Type',
+            options=[elem.name for elem in LocalInterpreterType],
+            disabled=False)
+    )
+    # if you change the description of this widget,
+    # you have to also adjust it in the notebook function call.
+    children.append(
+        widgets.SelectMultiple(
+            description='Model(s)',
+            options=[model.name for model in models],
+            disabled=False)
+    )
+
+    # Row 3
+    # if you change the description of this widget,
+    # you have to also adjust it in the notebook function call.
+    children.append(
+        widgets.RadioButtons(
+            options=[elem.name for elem in ExampleType],
+            layout={'width': 'max-content'},
+            description='Example(s) type:',
+            disabled=False
+        )
+    )
+
+    # if you change the description of this widget,
+    # you have to also adjust it in the notebook function call.
+    children.append(
+      widgets.IntSlider(
+          value=1,
+          min=1,
+          max=10,
+          step=1,
+          description='Number of examples:',
+          disabled=False,
+          continuous_update=False,
+          orientation='horizontal',
+          readout=True,
+          readout_format='d',
+        )
+    )
 
     return GridBox(children=children,
                    layout=Layout(
