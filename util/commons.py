@@ -1,16 +1,16 @@
-import IPython
 import pandas as pd
 import numpy as np
-import eli5
-import xai
 import logging as log
-import shap
 import enum
-import random
 
-from matplotlib import figure, axes
 from functools import partial
-from ipywidgets import widgets
+from random import choices
+from matplotlib import figure, axes
+from IPython import display
+from ipywidgets import Widget, GridBox, Select, SelectMultiple, IntSlider, RadioButtons
+from xai import balanced_train_test_split
+from eli5 import show_weights
+from shap import summary_plot, dependence_plot, force_plot
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, r2_score, mean_squared_error
@@ -25,16 +25,12 @@ from xgboost import XGBClassifier
 from pandas.api.types import is_numeric_dtype, is_string_dtype
 from multipledispatch import dispatch
 from pdpbox import pdp
-
 from util.dataset import Datasets, Dataset
 from util.model import Algorithm, Model, ModelType, ProblemType
 from util.split import Split, SplitTypes
 
-NUMERIC_TYPES = ["int", "float"]
+
 RANDOM_NUMBER = 33
-EXAMPLES_SPAN_ELI5 = 20
-EXAMPLES_SPAN_LIME = 10
-EXAMPLES_DIR_LIME = "lime_results"
 TEST_SPLIT_SIZE = 0.3
 
 
@@ -136,8 +132,8 @@ def get_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Ser
         -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series):
 
     if split.type is SplitTypes.BALANCED:
-        X_train_balanced, y_train_balanced, X_test_balanced, y_test_balanced, train_idx, test_idx = \
-            xai.balanced_train_test_split(
+        X_train_balanced, y_train_balanced, X_test_balanced, y_test_balanced, train_idx, test_idx =\
+            balanced_train_test_split(
                 df_x, df_y, *split.value,
                 min_per_group=300,
                 max_per_group=300,
@@ -203,13 +199,13 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
     return model, X_train, y_train, X_test, y_test
 
 
-def plot_feature_importance_with_eli5(model: Model) -> IPython.display.HTML:
+def plot_feature_importance_with_eli5(model: Model) -> display.HTML:
     """
     Global explanation for a model of type feature importance.
     :param model: The model to be interpreted.
     :return: IPython.display.HTML element with the feature importance.
     """
-    return eli5.show_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
+    return show_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
 
 
 def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Axes):
@@ -219,7 +215,10 @@ def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Ax
     :return: (f, ax): (figure instance, matplotlib.axes._subplots.AxesSubplot)
     """
 
-    f, ax = model.skater_interpreter.feature_importance.plot_feature_importance(model._skater_model, ascending=True)
+    f, ax = model.skater_interpreter.feature_importance.plot_feature_importance(
+        model.skater_model,
+        n_samples=1000,
+        ascending=True)
     return f, ax
 
 
@@ -230,7 +229,7 @@ def plot_feature_importance_with_shap(model: Model, plot_type="bar"):
     :param plot_type: The type of the plot
     :return: void
     """
-    shap.summary_plot(model.shap_values, model.X_test_ohe, plot_type=plot_type)
+    summary_plot(model.shap_values, model.X_test_ohe, plot_type=plot_type)
 
 
 def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
@@ -243,10 +242,11 @@ def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
 
     # model.model[0] to get the preprocessor from the pipeline
     X_test_ohe = model[0].fit_transform(X)
+
     return pd.DataFrame(X_test_ohe.toarray(), columns=feature_names)
 
 
-def generate_feature_importance_plot(type: str, model: Model) -> IPython.display.HTML:
+def generate_feature_importance_plot(type: str, model: Model):
     """
     Generate feature importance plot for a model.
     :param type: Type of feature importance method to be used.
@@ -374,7 +374,7 @@ def plot_single_pdp_with_shap(model: Model, feature: str):
     :return: void
     """
 
-    shap.dependence_plot(ind=feature,
+    dependence_plot(ind=feature,
                          interaction_index=feature,
                          shap_values=model.shap_values[0],
                          features=model.X_test_ohe)
@@ -391,7 +391,7 @@ def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto'):
     :return: void
     """
 
-    shap.dependence_plot(ind=feature1,
+    dependence_plot(ind=feature1,
                          interaction_index=feature2,
                          shap_values=model.shap_values[0],
                          features=model.X_test_ohe)
@@ -553,7 +553,7 @@ def explain_single_instance_with_shap(model: Model, example: int, expected_value
     :return: A plot for the explanation.
     """
 
-    return shap.force_plot(
+    return force_plot(
         model.shap_kernel_explainer.expected_value[expected_value_idx],
         model.shap_values[0][example, :],
         model.X_test_ohe.iloc[example, :])
@@ -574,17 +574,17 @@ def get_test_examples(model: Model, examples_type: ExampleType, number_of_exampl
 
     if number_of_examples > 0:
         if examples_type is ExampleType.RANDOM:
-            indexes = random.choices(model.X_test.index.tolist(), k=number_of_examples)
+            indexes = choices(model.X_test.index.tolist(), k=number_of_examples)
         else:
             X_output = model.X_test.copy()
             X_output.loc[:, 'predict'] = model.model.predict(X_output)
             X_output['result'] = model.y_test.values
             if examples_type is ExampleType.TRULY_CLASSIFIED:
                 truly_classified = X_output.loc[(X_output['predict'] == X_output['result'])].index.tolist()
-                indexes = random.choices(truly_classified, k=number_of_examples)
+                indexes = choices(truly_classified, k=number_of_examples)
             elif examples_type is ExampleType.FALSELY_CLASSIFIED:
                 falsely_classified = X_output.loc[(X_output['predict'] != X_output['result'])].index.tolist()
-                indexes = random.choices(falsely_classified, k=number_of_examples)
+                indexes = choices(falsely_classified, k=number_of_examples)
             else:
                 log.error("Example(s) type: {} is not yet supported for this function. Please either use another type"
                           "or extend the functionality.".format(examples_type.name))
@@ -763,16 +763,26 @@ def fill_empty_models(df_X: pd.DataFrame, df_y: pd.Series, number_of_models: int
     return models, msg
 
 
-def fill_model(model: Model) -> str:
+def fill_model(model: Model, algorithm=None, split=None) -> str:
     """
     A model is trained based on the properties selected by the user.
     :param model: The model to be filled - trained and then saved.
+    :param algorithm: The algorithm used for training the model.
+    :param split: The split used for training the model.
     :return: String message about the status of the model that should be displayed as info.
     """
     # split_type = model.split_type_dd.value
     # split_feature = list(model.cross_columns_sm.value)
-    model.model_type.algorithm = Algorithm[model.model_type_dd.value]
-    model.split = Split(SplitTypes[model.split_type_dd.value], list(model.cross_columns_sm.value))
+
+    if algorithm:
+        model.model_type.algorithm = algorithm
+    else:
+        model.model_type.algorithm = Algorithm[model.model_type_dd.value]
+
+    if split:
+        model.split = split
+    else:
+        model.split = Split(SplitTypes[model.split_type_dd.value], list(model.cross_columns_sm.value))
 
     model_pipeline, X_train, y_train, X_test, y_test = \
         train_model(model.model_type, model.split, model.X, model.y)
@@ -839,7 +849,7 @@ def get_models_by_names(models: list, names: list) -> list:
         return sub_models
 
 
-def get_model_by_remove_features_button(models: list, button: widgets.Widget) -> Model:
+def get_model_by_remove_features_button(models: list, button: Widget) -> Model:
     model = None
     for m in models:
         if m.remove_features_button is button:
@@ -851,7 +861,7 @@ def get_model_by_remove_features_button(models: list, button: widgets.Widget) ->
         return model
 
 
-def get_model_by_train_model_button(models: list, button: widgets.Widget) -> Model:
+def get_model_by_train_model_button(models: list, button: Widget) -> Model:
     model = None
     for m in models:
         if m.train_model_button is button:
@@ -863,7 +873,7 @@ def get_model_by_train_model_button(models: list, button: widgets.Widget) -> Mod
         return model
 
 
-def get_model_by_split_type_dd(models: list, dropdown: widgets.Widget) -> Model:
+def get_model_by_split_type_dd(models: list, dropdown: Widget) -> Model:
     model = None
     for m in models:
         if m.split_type_dd is dropdown:
@@ -875,17 +885,17 @@ def get_model_by_split_type_dd(models: list, dropdown: widgets.Widget) -> Model:
         return model
 
 
-def get_child_value_by_description(gridbox: widgets.GridBox, description: str, number: int):
+def get_child_value_by_description(gridbox: GridBox, description: str, number: int):
     child = _get_child_by_description(gridbox, description)[number]
     if child is None:
         log.error("No element with description {} found!".format(description))
         return
 
-    if isinstance(child, widgets.SelectMultiple):
+    if isinstance(child, SelectMultiple):
         child_value = list(child.value)
-    elif isinstance(child, widgets.Select) or isinstance(child, widgets.RadioButtons):
+    elif isinstance(child, Select) or isinstance(child, RadioButtons):
         child_value = str(child.value)
-    elif isinstance(child, widgets.IntSlider):
+    elif isinstance(child, IntSlider):
         child_value = child.value
     else:
         log.error("Type {} is not yet supported. Please extend this function in order to support it."
@@ -899,7 +909,7 @@ def get_child_value_by_description(gridbox: widgets.GridBox, description: str, n
     return child_value
 
 
-def _get_child_by_description(gridbox: widgets.GridBox, description: str) -> list:
+def _get_child_by_description(gridbox: GridBox, description: str) -> list:
     selects = []
     for child in gridbox.children:
         if child.description == description:

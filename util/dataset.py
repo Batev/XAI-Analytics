@@ -1,10 +1,9 @@
 import enum
 import pandas as pd
 import logging as log
-import statsmodels.api as sm
-import requests
-import io
 
+from statsmodels.api import datasets
+from io import StringIO
 from xai.data import load_census
 
 
@@ -62,7 +61,7 @@ class Dataset:
         dataset_id = Datasets.other
         status, content = is_url_valid(url=url)
         if status:
-            df = pd.read_csv(io.StringIO(content.decode('utf-8')))
+            df = pd.read_csv(StringIO(content.decode('utf-8')))
         else:
             msg = "Invalid URL to a dataset: {}.".format(url)
             log.error(msg)
@@ -187,7 +186,7 @@ class Dataset:
     @staticmethod
     def get_dataframe(id: Datasets) -> pd.DataFrame:
         if id.value <= 26:
-            cmd = "sm.datasets.{}.load_pandas().data".format(id.name)
+            cmd = "datasets.{}.load_pandas().data".format(id.name)
             return eval(cmd)
         elif id.value == 27:
             return load_census()

@@ -1,6 +1,5 @@
-import logging as log
-
-from ipywidgets import widgets, Layout, ButtonStyle, Label, GridBox, Button, HBox
+from ipywidgets import Widget, Layout, ButtonStyle, Label, GridBox, Button, \
+    HBox, RadioButtons, IntSlider, Dropdown, Select, SelectMultiple
 from util.commons import get_model_by_id, FeatureImportanceType, PDPType, LocalInterpreterType, ExampleType
 from util.split import SplitTypes
 
@@ -33,7 +32,7 @@ def generate_analyze_grid(
 
 def add_dummy_widgets(min_number, children, number_of_models):
     for i in range(min_number - number_of_models):
-        children.append(widgets.Button(layout=Layout(width='auto', height='auto'), disabled=True,
+        children.append(Button(layout=Layout(width='auto', height='auto'), disabled=True,
                                        style=ButtonStyle(button_color='white')))
 
 
@@ -71,7 +70,7 @@ def generate_model_grid(df_X,
 
     # Row 2
     for i in range(number_of_models):
-        w = widgets.SelectMultiple(options=df_X_columns, rows=len_df_X_columns if len_df_X_columns <= 20 else 20,
+        w = SelectMultiple(options=df_X_columns, rows=len_df_X_columns if len_df_X_columns <= 20 else 20,
                                    layout=Layout(width='auto', height='auto'))
         model = get_model_by_id(models, i)
         model.remove_features_sm = w
@@ -81,7 +80,7 @@ def generate_model_grid(df_X,
 
     # Row 3
     for i in range(number_of_models):
-        w = widgets.Button(description='Remove features', disabled=False, button_style='danger', tooltip='Click me',
+        w = Button(description='Remove features', disabled=False, button_style='danger', tooltip='Click me',
                            icon='trash', layout=Layout(width='auto', height='auto'))
         w.on_click(on_click_feature_exclude_button)
         model = get_model_by_id(models, i)
@@ -99,7 +98,7 @@ def generate_model_grid(df_X,
     # Row 5:
     for i in range(number_of_models):
         model = get_model_by_id(models, i)
-        w = widgets.Dropdown(options=model.model_type.algorithm_options, description='Model type:', disabled=False,
+        w = Dropdown(options=model.model_type.algorithm_options, description='Model type:', disabled=False,
                              layout=Layout(width='auto', height='auto'))
         model.model_type_dd = w
         children.append(w)
@@ -108,7 +107,7 @@ def generate_model_grid(df_X,
 
     # Row 6:
     for i in range(number_of_models):
-        w = widgets.Dropdown(options=[s.name for s in SplitTypes], description='Train/Test split type:', disabled=False,
+        w = Dropdown(options=[s.name for s in SplitTypes], description='Train/Test split type:', disabled=False,
                              layout=Layout(width='auto', height='auto'),
                              description_tooltip='Splits the features and the target into train/test split training '
                                                  'sets with a balanced number of examples for each of the categories of'
@@ -134,7 +133,7 @@ def generate_model_grid(df_X,
     # Row 8:
     for i in range(number_of_models):
         model = get_model_by_id(models, i)
-        w = widgets.SelectMultiple(options=model.X, rows=8 if len_df_X_columns <= 20 else 20,
+        w = SelectMultiple(options=model.X, rows=8 if len_df_X_columns <= 20 else 20,
                                    layout=Layout(width='auto', height='auto'), description='', disabled=True,
                                    description_tooltip='One or more positional arguments (passed as *args) '
                                                        'that are used to split the data into the cross product '
@@ -146,7 +145,7 @@ def generate_model_grid(df_X,
 
     # Row 9:
     for i in range(number_of_models):
-        w = widgets.Button(description='Train model', disabled=False, button_style='success', tooltip='Click me',
+        w = Button(description='Train model', disabled=False, button_style='success', tooltip='Click me',
                            icon='cogs', layout=Layout(width='auto', height='auto'))
         w.on_click(on_click_model_train_button)
         model = get_model_by_id(models, i)
@@ -165,15 +164,15 @@ def generate_model_grid(df_X,
                            grid_gap='1px 1px'))
 
 
-def init_strip_eq_radio(on_value_change_eq_radio) -> widgets:
-    eq_radio = widgets.RadioButtons(options=['>', '=', '<'], value='=')
+def init_strip_eq_radio(on_value_change_eq_radio) -> Widget:
+    eq_radio = RadioButtons(options=['>', '=', '<'], value='=')
     eq_radio.observe(on_value_change_eq_radio, names='value')
 
     return eq_radio
 
 
-def init_strip_value_slider(on_value_change_value_slider, min_val: float, max_val: float, step: float) -> widgets:
-    value_slider = widgets.IntSlider(value=min_val, min=min_val, max=max_val, step=step, disabled=False,
+def init_strip_value_slider(on_value_change_value_slider, min_val: float, max_val: float, step: float) -> Widget:
+    value_slider = IntSlider(value=min_val, min=min_val, max=max_val, step=step, disabled=False,
                                      continuous_update=False, orientation='horizontal', readout=True,
                                      readout_format='d', layout=Layout(width='214px', height='auto'))
     value_slider.observe(on_value_change_value_slider, names='value')
@@ -181,8 +180,8 @@ def init_strip_value_slider(on_value_change_value_slider, min_val: float, max_va
     return value_slider
 
 
-def init_strip_value_select_dropdown(on_value_change_value_select_dropdown, options: list) -> widgets:
-    value_select_dropdown = widgets.Dropdown(options=options, value=None,
+def init_strip_value_select_dropdown(on_value_change_value_select_dropdown, options: list) -> Widget:
+    value_select_dropdown = Dropdown(options=options, value=None,
                                              layout=Layout(width='214px', height='auto'))
     value_select_dropdown.observe(on_value_change_value_select_dropdown, names='value')
 
@@ -193,7 +192,7 @@ def generate_reset_strip_hbox(on_click_reset_button):
 
     children = []
 
-    reset_button = widgets.Button(disabled=False, style=ButtonStyle(button_color='gray'),
+    reset_button = Button(disabled=False, style=ButtonStyle(button_color='gray'),
                                   tooltip='Reset the dataset to its initial state',
                                   icon='undo', layout=Layout(width='auto', height='auto'))
     reset_button.on_click(on_click_reset_button)
@@ -225,7 +224,7 @@ def generate_feature_importance_grid(models: list) -> GridBox:
     # if you change the description of this widget,
     # you have to also adjust it in the notebook function call.
     children.append(
-        widgets.Select(
+        Select(
             description='Type',
             options=[elem.name for elem in FeatureImportanceType],
             disabled=False)
@@ -233,7 +232,7 @@ def generate_feature_importance_grid(models: list) -> GridBox:
     # if you change the description of this widget,
     # you have to also adjust it in the notebook function call.
     children.append(
-        widgets.SelectMultiple(
+        SelectMultiple(
             description='Model(s)',
             options=[model.name for model in models],
             disabled=False)
@@ -261,7 +260,7 @@ def generate_pdp_grid(models: list) -> GridBox:
         # if you change the description of this widget,
         # you have to also adjust it in the notebook function call.
         children.append(
-            widgets.Select(
+            Select(
                 description='Type',
                 options=[elem.name for elem in PDPType],
                 disabled=False)
@@ -269,7 +268,7 @@ def generate_pdp_grid(models: list) -> GridBox:
         # if you change the description of this widget,
         # you have to also adjust it in the notebook function call.
         children.append(
-            widgets.SelectMultiple(
+            SelectMultiple(
                 description='Model(s)',
                 options=[model.name for model in models],
                 disabled=False)
@@ -301,12 +300,12 @@ def generate_pdp_feature_selection_grid(models: list) -> GridBox:
         features.insert(0, 'None')
 
         children.append(
-            widgets.Select(
+            Select(
                 description="... " + model.name,
                 options=model.features_ohe,
                 disabled=False))
         children.append(
-            widgets.Select(
+            Select(
                 description="... " + model.name,
                 options=features,
                 value='None',
@@ -334,7 +333,7 @@ def generate_local_interpretation_grid(models: list) -> GridBox:
     # if you change the description of this widget,
     # you have to also adjust it in the notebook function call.
     children.append(
-        widgets.Select(
+        Select(
             description='Type',
             options=[elem.name for elem in LocalInterpreterType],
             disabled=False)
@@ -342,7 +341,7 @@ def generate_local_interpretation_grid(models: list) -> GridBox:
     # if you change the description of this widget,
     # you have to also adjust it in the notebook function call.
     children.append(
-        widgets.SelectMultiple(
+        SelectMultiple(
             description='Model(s)',
             options=[model.name for model in models],
             disabled=False)
@@ -352,7 +351,7 @@ def generate_local_interpretation_grid(models: list) -> GridBox:
     # if you change the description of this widget,
     # you have to also adjust it in the notebook function call.
     children.append(
-        widgets.RadioButtons(
+        RadioButtons(
             options=[elem.name for elem in ExampleType],
             layout={'width': 'max-content'},
             description='Example(s) type:',
@@ -363,7 +362,7 @@ def generate_local_interpretation_grid(models: list) -> GridBox:
     # if you change the description of this widget,
     # you have to also adjust it in the notebook function call.
     children.append(
-      widgets.IntSlider(
+      IntSlider(
           value=1,
           min=1,
           max=10,
