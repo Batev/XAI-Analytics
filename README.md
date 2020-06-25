@@ -5,7 +5,7 @@
 XAI-Analytics is a tool that opens the black-box of machine learning. It makes model interpretability easy. 
 **XAI-Analytics** offers a wide range of features such as data visualization, data preprocessing, ML-model training and global and local ML-model interpreting.
 The interactive Jupyter Notebook offers an user-friendly interface that gives the user full control over the tool. 
-For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section.
+For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For examples please refer to [examples](#examples).
 
 ## Getting started
 
@@ -68,7 +68,7 @@ _Demo for version 1.0._
 
 [![Demo](https://img.youtube.com/vi/x-FImaqYme8/0.jpg)](https://www.youtube.com/watch?v=x-FImaqYme8)
 
-## Examples
+##  <a name="examples"></a>Examples
 An example notebook could be found in [examples](https://github.com/Batev/XAI-Analytics/tree/master/examples). For a quick HTML overview of the example notebook: [preview](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/examples/XAI-Example.html)
 
 ## Known Issues
@@ -86,7 +86,7 @@ An example notebook could be found in [examples](https://github.com/Batev/XAI-An
 
 ## Creators
 
-This project was created by [Evgeni Batev](https://www.linkedin.com/in/evgeni-batev-49124b40/) under the supervision of [Ao.univ.Prof. Dr. Andreas Rauber](http://www.ifs.tuwien.ac.at/~andi/) at the [Vienna University of Technology](https://www.tuwien.at/en/)
+This project was created by [Evgeni Batev](https://www.linkedin.com/in/evgeni-batev-49124b40/) under the supervision of [Ao.univ.Prof. Dr. Andreas Rauber](http://www.ifs.tuwien.ac.at/~andi/) at the [Vienna University of Technology](https://www.tuwien.at/en/).
 
 ## License
 
