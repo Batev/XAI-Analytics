@@ -4,12 +4,12 @@ import logging as log
 import enum
 
 from functools import partial
-from random import choices
+from random import choice, choices
 from matplotlib import figure, axes
 from IPython import display
 from ipywidgets import Widget, GridBox, Select, SelectMultiple, IntSlider, RadioButtons
 from xai import balanced_train_test_split
-from eli5 import show_weights
+from eli5 import show_weights, explain_weights
 from shap import summary_plot, dependence_plot, force_plot
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
@@ -230,6 +230,66 @@ def plot_feature_importance_with_shap(model: Model, plot_type="bar"):
     :return: void
     """
     summary_plot(model.shap_values, model.X_test_ohe, plot_type=plot_type)
+
+
+def generate_eli5_weight_explanation(models: list, upper_bound: int = 3) -> str:
+    """
+    Generate explanation regarding the weights of some features for each model.
+    :param models: Models, for which an explanation should be generated.
+    :param upper_bound: For how many features an explanation should be generated per model.
+    :return: String message containing an auto-generated explanation.
+    """
+    expln = ["Explanation:\n"]
+    phrases = ["same as", "identical to", "alike", "matching"]
+    order = {}
+    visited = []
+
+    for count in range(0, upper_bound):
+        for model in models:
+            weights = explain_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
+            try:
+                feature = weights.targets[0].feature_weights.pos[count].feature
+                weight = weights.targets[0].feature_weights.pos[count].weight
+            except TypeError:
+                feature = weights.feature_importances.importances[count].feature
+                weight = weights.feature_importances.importances[count].weight
+
+            msg = "The {}{} feature for {} is {} with weight ~{}"\
+                .format(_get_nth_ordinal(count + 1) + " " if count + 1 != 1 else "",
+                        "highest",
+                        model.name,
+                        feature,
+                        round(weight, 3))
+
+            if feature in visited:
+                other_model = models[visited.index(feature) % len(models)]
+                msg = msg + ", {0} {1} for {2} but with different weight."\
+                    .format(choice(phrases),
+                            _get_nth_ordinal(order.get(other_model.name).index(feature) + 1),
+                            other_model.name)
+            else:
+                msg = msg + "."
+
+            expln.append(msg)
+            visited.append(feature)
+            order[model.name] = order.get(model.name, []) + [feature]
+
+        expln.append("\n")
+
+    return ' '.join(expln)
+
+
+def _get_nth_ordinal(n: int) -> str:
+    """
+    Convert an integer into its ordinal representation.
+    :param n: The number as an integer
+    :return: Ordinal representation of the nubmer (e.g., '0th', 3rd', '122nd', '213th')
+    """
+    n = int(n)
+    suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
+    if 11 <= (n % 100) <= 13:
+        suffix = 'th'
+    return str(n) + suffix
 
 
 def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
