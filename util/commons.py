@@ -232,47 +232,113 @@ def plot_feature_importance_with_shap(model: Model, plot_type="bar"):
     summary_plot(model.shap_values, model.X_test_ohe, plot_type=plot_type)
 
 
-def generate_eli5_weight_explanation(models: list, upper_bound: int = 3) -> str:
+def generate_eli5_feature_importance_explanation(models: list, upper_bound: int = 3) -> str:
     """
     Generate explanation regarding the weights of some features for each model.
     :param models: Models, for which an explanation should be generated.
     :param upper_bound: For how many features an explanation should be generated per model.
     :return: String message containing an auto-generated explanation.
     """
+
+    model_weight = {}
+    for model in models:
+        weights = explain_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
+        try:
+            weights = weights.targets[0].feature_weights.pos
+        except TypeError:
+            weights = weights.feature_importances.importances
+
+        feature_weight = {}
+        for weight in weights:
+            feature_weight[weight.feature] = weight.weight
+
+        model_weight[model.name] = feature_weight
+
+    return _generate_generic_feature_importance_explanation(upper_bound, model_weight)
+
+
+def generate_skater_feature_importance_explanation(models: list, upper_bound: int = 3) -> str:
+    """
+    Generate explanation regarding the (permutation) feature importance for each feature of a model.
+    :param models: Models, for which an explanation should be generated.
+    :param upper_bound: For how many features an explanation should be generated per model.
+    :return: String message containing an auto-generated explanation.
+    """
+
+    model_weight = {}
+    for model in models:
+        if not model.skater_model or not model.skater_interpreter:
+            model.init_skater()
+
+        weights = model.skater_interpreter.feature_importance.feature_importance(model.skater_model)
+        feature_weight = {}
+
+        for i in range(1, len(weights) + 1):
+            feature_weight[list(weights.keys())[i*(-1)]] = weights[i*(-1)]
+
+        model_weight[model.name] = feature_weight
+
+    return _generate_generic_feature_importance_explanation(upper_bound, model_weight)
+
+
+def generate_shap_feature_importance_explanation(models: list, upper_bound: int = 3) -> str:
+    """
+    Generate explanation regarding the average impact on model output magnitude for each feature of a model.
+    :param models: Models, for which an explanation should be generated.
+    :param upper_bound: For how many features an explanation should be generated per model.
+    :return: String message containing an auto-generated explanation.
+    """
+    model_weight = {}
+
+    for model in models:
+        if not model.shap_values:
+            model.init_shap()
+
+        feature_mean = {}
+        feature_order = np.argsort(np.sum(-np.mean(np.abs(model.shap_values), axis=1), axis=0))
+        feature_weight = np.sum(np.mean(np.abs(model.shap_values), axis=1), axis=0)
+
+        for feature_key in feature_order:
+            feature_mean[model.features_ohe[feature_key]] = feature_weight[feature_key].round(3)
+        model_weight[model.name] = feature_mean
+
+    return _generate_generic_feature_importance_explanation(upper_bound, model_weight)
+
+
+def _generate_generic_feature_importance_explanation(upper_bound: int, model_weight: dict) -> str:
+    """
+    Generates the explanation messages given a the weights and feature names for each model.
+    :param upper_bound: For how many features should a message be generated
+    :param model_weight: A dict consisting of [model name] -> [dict] (consisting of [feature] -> [weight])
+    :return:
+    """
+
     expln = ["Explanation:\n"]
-    phrases = ["same as", "identical to", "alike", "matching"]
-    order = {}
+    phrases = ["same as", "identical to", "alike", "matching", "similar to"]
     visited = []
 
-    for count in range(0, upper_bound):
-        for model in models:
-            weights = explain_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
-            try:
-                feature = weights.targets[0].feature_weights.pos[count].feature
-                weight = weights.targets[0].feature_weights.pos[count].weight
-            except TypeError:
-                feature = weights.feature_importances.importances[count].feature
-                weight = weights.feature_importances.importances[count].weight
+    for model_name, weights in model_weight.items():
+        for count in range(0, upper_bound):
+            feature = list(weights.keys())[count]
+            weight = weights[feature]
 
             msg = "The {}{} feature for {} is {} with weight ~{}"\
                 .format(_get_nth_ordinal(count + 1) + " " if count + 1 != 1 else "",
                         "highest",
-                        model.name,
+                        model_name,
                         feature,
                         round(weight, 3))
 
             if feature in visited:
-                other_model = models[visited.index(feature) % len(models)]
+                other_model_name = list(model_weight.keys())[visited.index(feature) // upper_bound]
                 msg = msg + ", {0} {1} for {2} but with different weight."\
                     .format(choice(phrases),
-                            _get_nth_ordinal(order.get(other_model.name).index(feature) + 1),
-                            other_model.name)
+                            _get_nth_ordinal(list(model_weight[other_model_name].keys()).index(feature) + 1),
+                            other_model_name)
             else:
                 msg = msg + "."
-
             expln.append(msg)
             visited.append(feature)
-            order[model.name] = order.get(model.name, []) + [feature]
 
         expln.append("\n")
 
@@ -331,6 +397,22 @@ def generate_feature_importance_plot(type: str, model: Model):
         log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
 
     return plot
+
+
+def generate_feature_importance_explanation(type: str, models: list, upper_bound: int = 3) -> str:
+
+    log.info("Generating feature importance explanation for {} ...".format(type))
+
+    if FeatureImportanceType[type] == FeatureImportanceType.ELI5:
+        str = generate_eli5_feature_importance_explanation(models, upper_bound)
+    elif FeatureImportanceType[type] == FeatureImportanceType.SKATER:
+        str = generate_skater_feature_importance_explanation(models, upper_bound)
+    elif FeatureImportanceType[type] == FeatureImportanceType.SHAP:
+        str = generate_shap_feature_importance_explanation(models, upper_bound)
+    else:
+        log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+
+    return str
 
 
 def generate_pdp_plots(type: str, model: Model, feature1: str, feature2: str):
