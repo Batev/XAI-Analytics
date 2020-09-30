@@ -372,7 +372,7 @@ def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
     return pd.DataFrame(X_test_ohe.toarray(), columns=feature_names)
 
 
-def generate_feature_importance_plot(type: str, model: Model):
+def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
     """
     Generate feature importance plot for a model.
     :param type: Type of feature importance method to be used.
@@ -381,15 +381,15 @@ def generate_feature_importance_plot(type: str, model: Model):
     is returned, None otherwise
     """
     plot = None
-    log.info("Generating a feature importance plot using {} for {} ...".format(type, model.name))
+    log.info("Generating a feature importance plot using {} for {} ...".format(type.name, model.name))
 
-    if FeatureImportanceType[type] == FeatureImportanceType.ELI5:
+    if type == FeatureImportanceType.ELI5:
         plot = plot_feature_importance_with_eli5(model)
-    elif FeatureImportanceType[type] == FeatureImportanceType.SKATER:
+    elif type == FeatureImportanceType.SKATER:
         if not model.skater_model or not model.skater_interpreter:
             model.init_skater()
         plot_feature_importance_with_skater(model)
-    elif FeatureImportanceType[type] == FeatureImportanceType.SHAP:
+    elif type == FeatureImportanceType.SHAP:
         if not model.shap_values:
             model.init_shap()
         plot_feature_importance_with_shap(model)
@@ -399,15 +399,22 @@ def generate_feature_importance_plot(type: str, model: Model):
     return plot
 
 
-def generate_feature_importance_explanation(type: str, models: list, upper_bound: int = 3) -> str:
+def generate_feature_importance_explanation(type: FeatureImportanceType, models: list, upper_bound: int = 3) -> str:
+    """
+    Auto-generate explanation for the feature importance results of each model in the list.
+    :param type: Type of feature importance that should be explained
+    :param models: List of all models for which an explanation should be generated
+    :param upper_bound: For how many features of each model a generation should be generated
+    :return: A string containing the explanation.
+    """
 
-    log.info("Generating feature importance explanation for {} ...".format(type))
+    log.info("Generating feature importance explanation for {} ...".format(type.name))
 
-    if FeatureImportanceType[type] == FeatureImportanceType.ELI5:
+    if type == FeatureImportanceType.ELI5:
         str = generate_eli5_feature_importance_explanation(models, upper_bound)
-    elif FeatureImportanceType[type] == FeatureImportanceType.SKATER:
+    elif type == FeatureImportanceType.SKATER:
         str = generate_skater_feature_importance_explanation(models, upper_bound)
-    elif FeatureImportanceType[type] == FeatureImportanceType.SHAP:
+    elif type == FeatureImportanceType.SHAP:
         str = generate_shap_feature_importance_explanation(models, upper_bound)
     else:
         log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
@@ -415,23 +422,31 @@ def generate_feature_importance_explanation(type: str, models: list, upper_bound
     return str
 
 
-def generate_pdp_plots(type: str, model: Model, feature1: str, feature2: str):
+def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str):
+    """
+    Generate a PDP including one or two features for a given model.
+    :param type: Type of framework that should be used for generating the PDPs
+    :param model: Model for which a plot shall be generated
+    :param feature1: Feature to be included in the PDP.
+    :param feature2: If none, plot a PDP for only feature1
+    :return: None; TODO: return a plot.
+    """
     plot = None
 
-    log.info("Generating a PDP plot using {} for {} ...".format(type, model.name))
-    if PDPType[type] == PDPType.PDPBox:
+    log.info("Generating a PDP plot using {} for {} ...".format(type.name, model.name))
+    if type == PDPType.PDPBox:
         if feature2 == 'None':
             plot_single_pdp_with_pdpbox(model, feature1)
         else:
             plot_multi_pdp_with_pdpbox(model, feature1, feature2)
-    elif PDPType[type] == PDPType.SKATER:
+    elif type == PDPType.SKATER:
         if not model.skater_model or not model.skater_interpreter:
             model.init_skater()
         if feature2 == 'None':
             plot_single_pdp_with_skater(model, feature1)
         else:
             plot_multi_pdp_with_skater(model, feature1, feature2)
-    elif PDPType[type] == PDPType.SHAP:
+    elif type == PDPType.SHAP:
         if not model.shap_values:
             model.init_shap()
         if feature2 == 'None':
@@ -587,11 +602,11 @@ def generate_idx2ohe_dict(X: pd.DataFrame, cat_features: list, ohe_cat_features:
     return categorical_names.copy()
 
 
-def explain_single_instance(model: Model, local_interpreter: LocalInterpreterType, example: int):
+def explain_single_instance(local_interpreter: LocalInterpreterType, model: Model, example: int):
     """
     Explain single instance (example) with a given interpreter type.
-    :param model: The model for which an instance should be explained
     :param local_interpreter: Type of interpreter to be used. Currently only LIME and SHAP are supported
+    :param model: The model for which an instance should be explained
     :param example: The example to be explained - The row number from the X_test pd.DataFrame
     :return: An explanation
     """
