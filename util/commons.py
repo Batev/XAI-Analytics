@@ -313,7 +313,7 @@ def _generate_generic_feature_importance_explanation(upper_bound: int, model_wei
     :return:
     """
 
-    expln = ["Explanation:\n"]
+    expln = ["Summary:\n"]
     phrases = ["same as", "identical to", "alike", "matching", "similar to"]
     visited = []
 
@@ -602,6 +602,22 @@ def generate_idx2ohe_dict(X: pd.DataFrame, cat_features: list, ohe_cat_features:
     return categorical_names.copy()
 
 
+def get_example_information(model: Model, example: int):
+    """
+    Get information for a example by its index in the dataset.
+    :param model: Model, from which dataset the example should be used
+    :param example: Example index in the pandes.DataFrame
+    :return: A message containing example's data
+    """
+
+    msg = ""
+    msg = msg + "Example {}'s data: \n{}\n".format(example, model.X_test.iloc[example])
+    # msg = msg + "{}'s prediction for example {}: {}\n".format(model.name, example, model.predictions[example])
+    msg = msg + "Actual result for example {}: {}\n".format(example, model.y_test.iloc[example])
+
+    return msg
+
+
 def explain_single_instance(local_interpreter: LocalInterpreterType, model: Model, example: int):
     """
     Explain single instance (example) with a given interpreter type.
@@ -611,11 +627,6 @@ def explain_single_instance(local_interpreter: LocalInterpreterType, model: Mode
     :return: An explanation
     """
     explanation = None
-
-    log.info("Explanation for {}.".format(model.name))
-    log.info("Example {}'s data: \n{}".format(example, model.X_test.iloc[example]))
-    log.info("Model prediction for example {}: {}".format(example, model.predictions[example]))
-    log.info("Actual result for example {}: {} \n".format(example, model.y_test.iloc[example]))
 
     if local_interpreter is LocalInterpreterType.LIME:
         if not model.lime_explainer:
@@ -630,6 +641,241 @@ def explain_single_instance(local_interpreter: LocalInterpreterType, model: Mode
                   "or extend the functionality of this function".format(local_interpreter))
 
     return explanation
+
+
+def generate_single_instance_comparison(models: list, example: int) -> str:
+    """
+    Compare models' decisions for a given example.
+    :param models: All models to be compared
+    :param example: The example, which is classified by the models
+    :return: An a string containing information whether each model's decision was right or not.
+    """
+
+    classified = []
+    misclassified = []
+    for model in models:
+        if model.predictions[example] == model.y_test.iloc[example]:
+            classified.append(model.name)
+        else:
+            misclassified.append(model.name)
+
+    msg = "Example {} was truly classified by ".format(example)
+    if len(classified) > 0:
+        msg = msg + ', '.join(classified)
+    else:
+        msg = msg + "no model"
+
+    msg = msg + " and falsely classified by "
+    if len(misclassified) > 0:
+        msg = msg + ', '.join(misclassified)
+    else:
+        msg = msg + "no model"
+
+    return msg + ".\n For further clarification see the explanations below.\n"
+
+
+def generate_single_instance_explanation(local_interpreter: LocalInterpreterType, model: Model, example: int) -> str:
+    """
+    Generate an explanation for a single instance (example) for a model with a given interpreter type.
+    :param local_interpreter: Interpreter, that should be used
+    :param model: Model for whose decison an explanation shall be generated
+    :param example: Example, that should be explained
+    :return: An explanation.
+    """
+
+    explanation = ""
+
+    if local_interpreter is LocalInterpreterType.LIME:
+        if not model.lime_explainer:
+            model.init_lime()
+        explanation = generate_single_instance_explanation_with_lime(model, example)
+    elif local_interpreter is LocalInterpreterType.SHAP:
+        if not model.shap_values:
+            model.init_shap()
+        explanation = generate_single_instance_explanation_with_shap(model, example)
+    else:
+        log.error("Interpreter type {} is not yet supported for local interpretations. Please either use another one"
+                  "or extend the functionality of this function".format(local_interpreter))
+
+    return explanation
+
+
+def generate_single_instance_explanation_with_lime(model: Model, example: int) -> str:
+    """
+    Generate an explanation for a single instance (example) for a model with LIME.
+    :param model: Model for whose decison an explanation shall be generated
+    :param example: Example, that should be explained
+    :return: An explanation.
+    """
+
+    explanation = explain_single_instance(LocalInterpreterType.LIME, model, example)
+    feature_value = dict(explanation.as_list())
+    prediction_probability = explanation.predict_proba[_get_prediction_for_example(model, example)]
+
+    log.info("\nFeature value dict for {}: {}\n".format(model.name, feature_value))
+
+    return _generate_generic_single_instance_explanation(
+        model.name,
+        _strip_dict(feature_value, len(list(filter(lambda x: (x >= 0.0), list(feature_value.values())))), True),
+        _strip_dict(feature_value, len(list(filter(lambda x: (x < 0.0), list(feature_value.values())))), False),
+        prediction_probability,
+        'LIME')
+
+
+def generate_single_instance_explanation_with_shap(model: Model, example: int) -> str:
+    """
+    Generate an explanation for a single instance (example) for a model with SHAP.
+    :param model: Model for whose decison an explanation shall be generated
+    :param example: Example, that should be explained
+    :return: An explanation.
+    """
+    prediction = _get_prediction_for_example(model, example)
+
+    base_value = model.shap_kernel_explainer.expected_value[prediction]
+    shap_values = model.shap_values[prediction][example, :]
+    features = list(model.X_test_ohe.iloc[example, :].index)
+
+    feature_value = {}
+
+    for count in range(len(features)):
+        feature_value[features[count]] = shap_values[count]
+
+    prediction_probability = np.sum(shap_values) + base_value
+
+    pos_elems, neg_elems = _get_elements_number(list(feature_value.values()), 3, 2)
+
+    return _generate_generic_single_instance_explanation(
+        model.name,
+        _strip_dict(feature_value, pos_elems, True),
+        _strip_dict(feature_value, neg_elems, False),
+        prediction_probability,
+        'SHAP')
+
+
+def _generate_generic_single_instance_explanation(
+        model_name: str,
+        pos: dict,
+        neg: dict,
+        pred_prob: float,
+        type: str) -> str:
+    """
+    Generate an explanation message for a given model.
+    :param model_name: The name of the model that is going to be explained.
+    :param pos: A dictionary with features and their values that positively impact a decision
+    :param neg: A dictionary with features and their values that negatively impact a decision
+    :param pred_prob: The prediction probability of the model for the current decision
+    :param type: Type of explainer used (e.g, LIME, SHAP, ...)
+    :return: An explanation message.
+    """
+
+    msg = "The prediction probability of {}'s decision for this example is {}. {}'s explanation: \n"\
+        .format(model_name, str(round(pred_prob, 2)), type)
+    msg = msg + _generate_generic_single_instance_explanation_helper(pos, model_name, "positive (1)")
+    msg = msg + _generate_generic_single_instance_explanation_helper(neg, model_name, "negative (0)")
+    msg = msg + "\n"
+
+    return msg
+
+
+def _generate_generic_single_instance_explanation_helper(d: dict, model_name: str, desc: str) -> str:
+    """
+    A helper function for generating an explanation for the single instance explainers.
+    :param d: A dictionary containing all features and their values (values determined by an explainer)
+    :param model_name: The name of the model that is going to be explained.
+    :param desc: Additional information about the current explanation. (In most cases either 'positive' or 'negative')
+    :return: A message explanation for a current model and an explanation type - positive or negative values.
+    """
+
+    msg = ""
+    keys = list(d.keys())
+    values = list(d.values())
+
+    adverb_first = ['mostly', 'mainly', 'primarily', 'largely']
+    adjective_second = ['largest', 'biggest', 'most substantial', 'most considerable']
+    adjective_third = ['important', 'influential', 'impactful', 'effective']
+    verb = ['impact', 'influence', 'affect', 'change']
+
+    for c in range(len(d)):
+        value_rounded = round(values[c], 4)
+        if (c+1) == 1:
+            msg = msg + "The feature that {} {}s {}'s {} prediction probability is {} with value of {}.\n"\
+                .format(choice(adverb_first), choice(verb), model_name, desc, keys[c], value_rounded)
+        elif (c+1) == 2:
+            msg = msg + "The feature with the second {} {} on {}'s {} prediction probability is {} with value of {}.\n"\
+                .format(choice(adjective_second), choice(verb), model_name, desc, keys[c], value_rounded)
+        elif (c+1) == 3:
+            msg = msg + "The third most {} feature for the {} prediction probability of {} is {} with value of {}\n"\
+                .format(choice(adjective_third), desc, model_name, keys[c], value_rounded)
+        else:
+            msg = msg + "The {} feature that {} the {} prediction probability of {} is {} with value of {}\n"\
+                .format(_get_nth_ordinal(c+1), choice(verb), desc, model_name, keys[c], value_rounded)
+
+    return msg
+
+
+def _get_elements_number(l: list, pos_upper_bound: int = 3, neg_upper_bound: int = 2) -> (int, int):
+    """
+    Count all elements that are positive and all that negative and differ from zero.
+     If the there are more elements than the upper bound, return the upper bound.
+    :param l: The list that has to be counted
+    :param upper_bound: The upper bound used as a counter limiter
+    :return: A tuple containing the positive and negative element number.
+    """
+
+    count_pos = 0
+    count_neg = 0
+
+    for v in l:
+        if v != 0 and v > 0 and count_pos != pos_upper_bound:
+            count_pos = count_pos + 1
+        elif v != 0 and v < 0 and count_neg != neg_upper_bound:
+            count_neg = count_neg + 1
+
+    return count_pos, count_neg
+
+
+def _strip_dict(d: dict, n: int, reverse: bool) -> dict:
+    """
+    Take the first n-elements of a list sorted (either ascending or descending) by its values.
+    Example: If n is 2 -> take the first two elements of the sorted dict.
+    :param d: The dictionary to be stripped.
+    :param n: The first elements to be taken.
+    :param reverse: If true take the first n-elements of the descending sorted dict.
+    If false take the first n-elements of the ascending sorted dict.
+    :return: A sub-dictionary of the original.
+    """
+    default_n = 2
+
+    if n > len(d):
+        log.error("The length({}) variable should be lower than the length of the dictionary.\n"
+                  "Setting its value to default({})."
+                  .format(n, default_n))
+        n = default_n
+
+    sorted_d = _sort_dict_by_value(d, reverse=reverse)
+
+    return {k: v for (k, v) in sorted_d.items() if list(sorted_d.keys()).index(k) < n}
+
+
+def _sort_dict_by_value(d: dict, reverse: bool) -> dict:
+    """
+    Sort a dictionary by its values in descending or ascending order.
+    :param d: A dictionary to be sorted
+    :param reverse: If True -> sort in descending order, otherwise ascending
+    :return: The sorted dictionary
+    """
+    return {k: v for k, v in sorted(d.items(), key=lambda item: item[1], reverse=reverse)}
+
+
+def _get_prediction_for_example(model: Model, example: int) -> int:
+    """
+    Returns either 0 or 1 for a classifier depending on the how the example was classified by the model.
+    :param model: Model for which the example shall be classified
+    :param example: Example to be classified
+    :return: Either 0 or 1 depending on the result
+    """
+    predictions = list(model.model.predict_proba(model.X_test)[example])
+    return predictions.index(max(predictions))
 
 
 def convert_to_lime_format(X, categorical_names, col_names=None, invert=False):
@@ -701,7 +947,7 @@ def explain_single_instance_with_lime(model: Model, example: int):
     return explanation
 
 
-def explain_single_instance_with_shap(model: Model, example: int, expected_value_idx=0):
+def explain_single_instance_with_shap(model: Model, example: int):
     """
     Explain single instance with SHAP.
     :param model: The model, for which an explanation should be generated
@@ -709,10 +955,11 @@ def explain_single_instance_with_shap(model: Model, example: int, expected_value
     :param expected_value_idx: The index of the shap expected_value list
     :return: A plot for the explanation.
     """
+    prediction = _get_prediction_for_example(model, example)
 
     return force_plot(
-        model.shap_kernel_explainer.expected_value[expected_value_idx],
-        model.shap_values[0][example, :],
+        model.shap_kernel_explainer.expected_value[prediction],
+        model.shap_values[prediction][example, :],
         model.X_test_ohe.iloc[example, :])
 
 
