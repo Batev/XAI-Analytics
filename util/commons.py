@@ -86,6 +86,13 @@ def _divide_features(df: pd.DataFrame) -> (list, list):
 
 
 def get_column_transformer(numerical: list, categorical: list) -> ColumnTransformer:
+    """
+    Create a column transformer for the numerical and categorical columns later
+    used in the model pipeline.
+    :param numerical: Numerical columns in the dataset
+    :param categorical: Categorical columns in the dataset
+    :return: A new column transformer
+    """
 
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median'))])
@@ -102,6 +109,12 @@ def get_column_transformer(numerical: list, categorical: list) -> ColumnTransfor
 
 
 def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm) -> Pipeline:
+    """
+    Returns a new pipeline depending on the chosen algorithm.
+    :param ct: A column transformer used in the pipeline
+    :param algorithm: Algorithm that is then used for training the mdoel
+    :return: A new pipeline
+    """
 
     if algorithm is Algorithm.LOGISTIC_REGRESSION:
         return Pipeline([("preprocessor", ct),
@@ -130,6 +143,16 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm) -> Pipeline:
 
 def get_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Series)\
         -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series):
+    """
+    Splits the data in train and test data taking the split type (balanced/imbalanced) in
+    consideration.
+    :param split: Whether a balanced or imbalanced split shall be used. If balanced split is used
+    a feature for the split shall be selected
+    :param cat_features: The categorical features of the dataset
+    :param df_x: Dataset features
+    :param df_y: Dataset target
+    :return: X_train, X_test, y_train, y_test
+    """
 
     if split.type is SplitTypes.BALANCED:
         X_train_balanced, y_train_balanced, X_test_balanced, y_test_balanced, train_idx, test_idx =\
@@ -167,6 +190,15 @@ def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
 
 def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: pd.Series) -> \
         (Pipeline, pd.DataFrame, pd.Series):
+    """
+    Train a model on a dataset.
+    :param model_type: The type of model that has to be trained (training algorithm, ...)
+    :param split: Whether a balanced or imbalanced split shall be used. If balanced split is used
+    a feature for the split shall be selected
+    :param df_x: The features of the dataset
+    :param df_y: The target of the dataset
+    :return: A model pipeline, X_train, y_train, X_test, y_test
+    """
 
     num_features, cat_features = _divide_features(df_x)
 
@@ -557,6 +589,21 @@ def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto'):
 
 def plot_single_pdp_with_skater(model: Model, feature: str, n_samples=1000, grid_resolution=50, grid_range=(0, 1),
                                 with_variance=True, figsize=(6, 4)):
+    """
+    Plots a skater PDP for a single feature for a given model.
+    :param model: The model for which a PDP should be plotted
+    :param feature: Feature to be plotted
+    :param n_samples: The number of samples to use from the original dataset.
+    Note this is only active if sample = True and sampling strategy = 'uniform'.
+    If using 'uniform-over-similarity-ranks', use samples per bin
+    :param grid_resolution: How many unique values to include in the grid.
+    If the percentile range is 5% to 95%, then that range will be cut into <grid_resolution> equally size bins.
+    Defaults to 30.
+    :param grid_range: The percentile extrema to consider. 2 element tuple, increasing, bounded between 0 and 1.
+    :param with_variance:
+    :param figsize: Whether to include pdp error bars in the plots. Currently disabled for 3D plots for visibility.
+    :return: A plot
+    """
 
     r = model.skater_interpreter.partial_dependence.plot_partial_dependence([feature],
                                                                             model.skater_model,
@@ -570,6 +617,22 @@ def plot_single_pdp_with_skater(model: Model, feature: str, n_samples=1000, grid
 
 def plot_multi_pdp_with_skater(model: Model, feature1: str, feature2: str, n_samples=1000, grid_resolution=100,
                                grid_range=(0, 1), with_variance=False, figsize=(12, 5)):
+    """
+    Plots a skater PDP for two features for a given model.
+    :param model: The model for which a PDP should be plotted
+    :param feature1: Feature to be plotted
+    :param feature2: Feature with which feature1 interacts to be plotted.
+    :param n_samples: The number of samples to use from the original dataset.
+    Note this is only active if sample = True and sampling strategy = 'uniform'.
+    If using 'uniform-over-similarity-ranks', use samples per bin
+    :param grid_resolution: How many unique values to include in the grid.
+    If the percentile range is 5% to 95%, then that range will be cut into <grid_resolution> equally size bins.
+    Defaults to 30.
+    :param grid_range: The percentile extrema to consider. 2 element tuple, increasing, bounded between 0 and 1.
+    :param with_variance:
+    :param figsize: Whether to include pdp error bars in the plots. Currently disabled for 3D plots for visibility.
+    :return: A plot
+    """
 
     r = model.skater_interpreter.partial_dependence.plot_partial_dependence([(feature1, feature2)],
                                                                             model.skater_model,
