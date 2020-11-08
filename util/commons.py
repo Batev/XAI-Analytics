@@ -712,8 +712,6 @@ def generate_single_instance_explanation_with_lime(model: Model, example: int) -
     feature_value = dict(explanation.as_list())
     prediction_probability = explanation.predict_proba[_get_prediction_for_example(model, example)]
 
-    log.info("\nFeature value dict for {}: {}\n".format(model.name, feature_value))
-
     return _generate_generic_single_instance_explanation(
         model.name,
         _strip_dict(feature_value, len(list(filter(lambda x: (x >= 0.0), list(feature_value.values())))), True),
