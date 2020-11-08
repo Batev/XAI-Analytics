@@ -7,7 +7,6 @@ from functools import partial
 from random import choice, choices, randrange
 from matplotlib import figure, axes
 from IPython import display
-from ipywidgets import Widget, GridBox, Select, SelectMultiple, IntSlider, RadioButtons
 from xai import balanced_train_test_split
 from eli5 import show_weights, explain_weights
 from shap import summary_plot, dependence_plot, force_plot
@@ -1285,99 +1284,3 @@ def get_model_type(y: pd.Series) -> ModelType:
         model_type = ModelType(ProblemType.REGRESSION)
 
     return model_type
-
-
-def get_model_by_id(models: list, id: int) -> Model:
-    model = None
-    for m in models:
-        if m.id == id:
-            model = m
-
-    if model is None:
-        log.error("No model found with ID '{}'.".format(id))
-        return model
-    else:
-        return model
-
-
-def get_models_by_names(models: list, names: list) -> list:
-    sub_models = []
-    for name in names:
-        for model in models:
-            if model.name == name:
-                sub_models.append(model)
-
-    if not models:
-        log.error("No models found with names in {}''.".format(names))
-        return sub_models
-    else:
-        return sub_models
-
-
-def get_model_by_remove_features_button(models: list, button: Widget) -> Model:
-    model = None
-    for m in models:
-        if m.remove_features_button is button:
-            model = m
-    if model is None:
-        log.error("No model found with ID ''.".format(id))
-        return model
-    else:
-        return model
-
-
-def get_model_by_train_model_button(models: list, button: Widget) -> Model:
-    model = None
-    for m in models:
-        if m.train_model_button is button:
-            model = m
-    if model is None:
-        log.error("No model found with ID ''.".format(id))
-        return model
-    else:
-        return model
-
-
-def get_model_by_split_type_dd(models: list, dropdown: Widget) -> Model:
-    model = None
-    for m in models:
-        if m.split_type_dd is dropdown:
-            model = m
-    if model is None:
-        log.error("No model found with ID ''.".format(id))
-        return model
-    else:
-        return model
-
-
-def get_child_value_by_description(gridbox: GridBox, description: str, number: int):
-    child = _get_child_by_description(gridbox, description)[number]
-    if child is None:
-        log.error("No element with description {} found!".format(description))
-        return
-
-    if isinstance(child, SelectMultiple):
-        child_value = list(child.value)
-    elif isinstance(child, Select) or isinstance(child, RadioButtons):
-        child_value = str(child.value)
-    elif isinstance(child, IntSlider):
-        child_value = child.value
-    else:
-        log.error("Type {} is not yet supported. Please extend this function in order to support it."
-                  .format(type(child)))
-        return
-
-    if not child_value:
-        log.warning("No {} were selected. Please select at least one type and try again!".format(description))
-        return
-
-    return child_value
-
-
-def _get_child_by_description(gridbox: GridBox, description: str) -> list:
-    selects = []
-    for child in gridbox.children:
-        if child.description == description:
-            selects.append(child)
-
-    return selects
