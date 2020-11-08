@@ -69,7 +69,7 @@ _Demo for version 1.0._
 [![Demo](https://img.youtube.com/vi/x-FImaqYme8/0.jpg)](https://www.youtube.com/watch?v=x-FImaqYme8)
 
 ##  <a name="examples"></a>Examples
-An example notebook could be found in [examples](https://github.com/Batev/XAI-Analytics/tree/master/examples). For a quick HTML overview of the example notebook: [preview](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/examples/XAI-Example.html)
+An example notebook could be found in [examples](https://github.com/Batev/XAI-Analytics/tree/master). For a quick HTML overview of the example notebook: [preview](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/XAI-Example.html)
 
 ## Known Issues
 
