@@ -4,7 +4,7 @@ import logging as log
 import enum
 
 from functools import partial
-from random import choice, choices
+from random import choice, choices, randrange
 from matplotlib import figure, axes
 from IPython import display
 from ipywidgets import Widget, GridBox, Select, SelectMultiple, IntSlider, RadioButtons
@@ -30,7 +30,7 @@ from util.model import Algorithm, Model, ModelType, ProblemType
 from util.split import Split, SplitTypes
 
 
-RANDOM_NUMBER = 33
+RANDOM_NUMBER = randrange(100)
 TEST_SPLIT_SIZE = 0.3
 
 
