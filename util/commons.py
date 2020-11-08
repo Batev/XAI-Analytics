@@ -878,7 +878,8 @@ def _get_elements_number(l: list, pos_upper_bound: int = 3, neg_upper_bound: int
     Count all elements that are positive and all that negative and differ from zero.
      If the there are more elements than the upper bound, return the upper bound.
     :param l: The list that has to be counted
-    :param upper_bound: The upper bound used as a counter limiter
+    :param pos_upper_bound: The upper bound used as a positive counter limiter
+    :param neg_upper_bound: The upper bound used as a negative counter limiter
     :return: A tuple containing the positive and negative element number.
     """
 
@@ -1012,7 +1013,6 @@ def explain_single_instance_with_shap(model: Model, example: int):
     Explain single instance with SHAP.
     :param model: The model, for which an explanation should be generated
     :param example: Example number to be explained
-    :param expected_value_idx: The index of the shap expected_value list
     :return: A plot for the explanation.
     """
     prediction = _get_prediction_for_example(model, example)
