@@ -20,6 +20,7 @@ from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.exceptions import NotFittedError
 from xgboost import XGBClassifier
 from pandas.api.types import is_numeric_dtype, is_string_dtype
 from multipledispatch import dispatch
@@ -179,10 +180,15 @@ def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
     :return: All encoded features for the model.
     """
     preprocessor = model.named_steps["preprocessor"]
+
     # Get all categorical columns (including the newly encoded with the OHE)
-    new_ohe_features = preprocessor.named_transformers_["cat"].named_steps['onehot']\
-        .get_feature_names(cat_features)\
-        .tolist()
+    try:
+        new_ohe_features = preprocessor.named_transformers_["cat"].named_steps['onehot']\
+            .get_feature_names(cat_features)\
+            .tolist()
+    except NotFittedError:
+        log.warning("No categorical features found in this dataset.")
+        new_ohe_features = []
 
     return new_ohe_features
 
