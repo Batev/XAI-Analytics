@@ -465,9 +465,19 @@ def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
     """
 
     # model.model[0] to get the preprocessor from the pipeline
-    X_test_ohe = model[0].fit_transform(X)
+    X_ohe = model[0].fit_transform(X)
 
-    return pd.DataFrame(X_test_ohe.toarray(), columns=feature_names)
+    log.debug("Encoded dataframe shape: {}\n"
+              "Number of all encoded features: {}.".
+              format(X_ohe.shape[1], len(feature_names)))
+
+    try:
+        X_ohe = X_ohe.toarray()
+    except AttributeError as e:
+        log.debug("An expected error occurred. Program execution may continue: {}".format(e))
+        X_ohe = X_ohe
+
+    return pd.DataFrame(X_ohe, columns=feature_names)
 
 
 def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
