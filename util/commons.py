@@ -1219,12 +1219,34 @@ def fill_empty_models(df_X: pd.DataFrame, df_y: pd.Series, number_of_models: int
     log message indicating that the operation was successful.
     """
     models = []
+    _ensure_valid_dataset(df_X)
+
     for m in range(number_of_models):
         models.append(Model(m, "Model " + str(m+1), None, df_X, df_y, get_model_type(df_y)))
 
     msg = "Models to be trained: \'{}\'.".format(number_of_models)
     log.debug(msg)
     return models, msg
+
+
+def _ensure_valid_dataset(df: pd.DataFrame):
+    """
+    Make sure that no categorical feature in the dataset has more than upper_bound unique values.
+    :param df: Dataset to be tested
+    :return: void
+    """
+    _, cat = _divide_features(df)
+
+    upper_bound = 30
+    columns = []
+    for col in df.columns:
+        if col in cat and len(df[col].unique()) > upper_bound:
+            columns.append(col)
+
+    if len(columns) > 0:
+        raise NotImplementedError("Each column of {} contain more than {} unique values. "
+                                  "Such datasets are currently not supported. "
+                                  "Please preprocess your data and try again.".format(str(columns), upper_bound))
 
 
 def fill_model(model: Model, algorithm=None, split=None) -> str:
