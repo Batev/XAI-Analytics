@@ -1152,8 +1152,7 @@ def get_dataset(id: str) -> (Dataset, str):
     dataset = Dataset.built_in(id)
     msg = "Dataset \'{} ({})\' loaded successfully. For further information about this dataset please visit: {}"\
         .format(dataset.id.name, dataset.name, dataset.url)
-    log.info(msg)
-    log.info("\n{}".format(dataset.df.head()))
+    log.debug("{}\n{}".format(msg, dataset.df.head()))
 
     return dataset, msg
 
@@ -1169,8 +1168,7 @@ def get_dataset(name: str, url: str) -> (Dataset, str):
     dataset = Dataset.from_url(name, url)
     msg = "Dataset \'{} ({})\' loaded successfully. For further information about this dataset please visit: {}"\
         .format(dataset.id.name, dataset.name, dataset.url)
-    log.info(msg)
-    log.info("\n{}".format(dataset.df.head()))
+    log.debug("{}\n{}".format(msg, dataset.df.head()))
 
     return dataset, msg
 
