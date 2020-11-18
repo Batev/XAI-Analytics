@@ -1384,3 +1384,24 @@ def get_model_type(y: pd.Series) -> ModelType:
         model_type = ModelType(ProblemType.REGRESSION)
 
     return model_type
+
+
+def normalize_undefined_values(symbol: str, df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize (replace with 0.0) all rows containing undefined values
+    in the dataframe (e.g, ? values, "" strings, ...).
+    :param symbol: Symbol used for undefined values (?, "", NaN, ...)
+    :param df: The dataframe that has to be normalized
+    :return: New dataframe with 0.0 instead of the undefined rows
+    """
+    return df.replace(symbol, 0.0)
+
+
+def remove_undefined_rows(symbol: str, df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove all rows containing undefined values in the dataframe (e.g, ? values, "" strings, ...).
+    :param symbol: Symbol used for undefined values (?, "", NaN, ...)
+    :param df: The dataframe that has to be normalized
+    :return: New dataframe without the undefined rows.
+    """
+    return df.replace(symbol, float("NaN")).dropna()
