@@ -851,10 +851,13 @@ def generate_single_instance_explanation_with_lime(model: Model, example: int) -
     feature_value = dict(explanation.as_list())
     prediction_probability = explanation.predict_proba[_get_prediction_for_example(model, example)]
 
+    pos_elems = len(list(filter(lambda x: (x >= 0.0), list(feature_value.values()))))
+    neg_elems = len(list(filter(lambda x: (x < 0.0), list(feature_value.values()))))
+
     return _generate_generic_single_instance_explanation(
         model.name,
-        _strip_dict(feature_value, len(list(filter(lambda x: (x >= 0.0), list(feature_value.values())))), True),
-        _strip_dict(feature_value, len(list(filter(lambda x: (x < 0.0), list(feature_value.values())))), False),
+        _strip_dict(feature_value, pos_elems if pos_elems <= 3 else 3, True),
+        _strip_dict(feature_value, neg_elems if neg_elems <= 2 else 2, False),
         prediction_probability,
         'LIME')
 
