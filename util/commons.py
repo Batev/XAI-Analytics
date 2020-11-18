@@ -410,28 +410,31 @@ def _generate_generic_feature_importance_explanation(upper_bound: int, model_wei
 
     expln = ["Summary:\n"]
     phrases = ["same as", "identical to", "alike", "matching", "similar to"]
+    adjectives = ["highest", "best", "most important", "most valuable", "most influential"]
     visited = []
 
     for model_name, weights in model_weight.items():
+        if len(weights) < upper_bound:
+            upper_bound = len(weights)
         for count in range(0, upper_bound):
             feature = list(weights.keys())[count]
             weight = weights[feature]
 
             msg = "The {}{} feature for {} is {} with weight ~{}"\
                 .format(_get_nth_ordinal(count + 1) + " " if count + 1 != 1 else "",
-                        "highest",
+                        choice(adjectives),
                         model_name,
                         feature,
                         round(weight, 3))
 
             if feature in visited:
                 other_model_name = list(model_weight.keys())[visited.index(feature) // upper_bound]
-                msg = msg + ", {0} {1} for {2} but with different weight."\
+                msg = msg + ", {0} {1} for {2}.\n"\
                     .format(choice(phrases),
                             _get_nth_ordinal(list(model_weight[other_model_name].keys()).index(feature) + 1),
                             other_model_name)
             else:
-                msg = msg + "."
+                msg = msg + ".\n"
             expln.append(msg)
             visited.append(feature)
 
