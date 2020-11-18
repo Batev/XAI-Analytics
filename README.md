@@ -69,11 +69,13 @@ _Demo for version 1.0._
 [![Demo](https://img.youtube.com/vi/x-FImaqYme8/0.jpg)](https://www.youtube.com/watch?v=x-FImaqYme8)
 
 ##  <a name="examples"></a>Examples
-An example notebook could be found in [examples](https://github.com/Batev/XAI-Analytics/tree/master). For a quick HTML overview of the example notebook: [preview](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/XAI-Example.html)
+Example notebooks can be found in [examples](https://github.com/Batev/XAI-Analytics/tree/master). Quick HTML overview of the example notebooks:
+* [Adult Census Income](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/XAI-Example-Income.html)
+* [Risk Factors for Cervical Cancer](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/XAI-Example-Cervical.html)
 
 ## Known Issues
 
-* Error when training a model on a dataset without any *categorical* columns (or only one categorical column that is the target)
+* ~~Error when training a model on a dataset without any *categorical* columns (or only one categorical column that is the target)~~ -> Fixed by [b87a276](https://github.com/Batev/XAI-Analytics/commit/b87a2769cc3e817be45c39f95321a0bd0873d5b2).
 * Internal *PDPBox* error when plotting a PDP: https://github.com/SauceCat/PDPbox/issues/40
 * *Skater* cannot be installed with *pip*: https://github.com/amueller/word_cloud/issues/134
 * Not all interpretation techniques work with *XGBoost*.
@@ -83,6 +85,10 @@ An example notebook could be found in [examples](https://github.com/Batev/XAI-An
 * Add XAI-Analytics to [A gallery of interesting Jupyter Notebooks](https://github.com/jupyter/jupyter/wiki/A-gallery-of-interesting-Jupyter-Notebooks) when ALPHA version is released.
 * Add auto-generated adversarial examples to some dataset.
 * Fix *XGBoost* interpretations bug.
+* Add option for removing features from a dataset in the preprocessing step.
+* Add option for normalizing/removing unknown values from a dataset in the preprocessing step.
+* Add custom exceptions and raise them where needed.
+* Improve logging -> do not show info messages in the notebooks, use display instead. Add more debug messages.
 
 ## Creators
 
