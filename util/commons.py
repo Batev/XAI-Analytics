@@ -1278,7 +1278,7 @@ def get_model_type(y: pd.Series) -> ModelType:
     """
 
     model_type = None
-    if is_string_dtype(y):
+    if is_string_dtype(y) or len(y.unique()) == 2:
         model_type = ModelType(ProblemType.CLASSIFICATION)
     else:
         model_type = ModelType(ProblemType.REGRESSION)
