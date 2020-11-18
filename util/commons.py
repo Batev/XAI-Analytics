@@ -222,6 +222,7 @@ def _get_train_test_split(split: Split, cat_features: list, df_x: pd.DataFrame, 
         log.debug("Random number used for the train/test split: {}.".format(random_number_split))
         X_train, X_test, y_train, y_test = train_test_split(df_x,
                                                             df_y,
+                                                            stratify=df_y,
                                                             test_size=TEST_SPLIT_SIZE,
                                                             random_state=random_number_split)
         return X_train, X_test, y_train, y_test
