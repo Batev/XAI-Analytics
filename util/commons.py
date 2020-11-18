@@ -141,7 +141,62 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm) -> Pipeline:
         raise NotImplementedError
 
 
-def get_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Series)\
+def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Series)\
+        -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series):
+    """
+    Splits the data in train and test data taking the split type (balanced/imbalanced) in
+    consideration. Also this function makes sure that the number of features after encoding them
+    using sklearn.preprocessing.OneHotEncoder is same for the train and the test splits.
+    If for iter_limit iterations the no split is found that has the same number of features
+    for the train and test split, then an error is risen.
+    :param preprocessor: A preprocessor containing a sklearn.preprocessing.OneHotEncoder that
+    will be used for training the model.
+    :param split: Whether a balanced or imbalanced split shall be used. If balanced split is used
+    a feature for the split shall be selected
+    :param cat_features: The categorical features of the dataset
+    :param df_x: Dataset features
+    :param df_y: Dataset target
+    :return: X_train, X_test, y_train, y_test
+    """
+
+    X_train, X_test, y_train, y_test = pd.DataFrame(), pd.DataFrame(), pd.Series(), pd.Series()
+
+    if cat_features:
+        iter_limit = 50
+        are_sets_equal = False
+        count = 0
+
+        while not are_sets_equal:
+            X_train, X_test, y_train, y_test = _get_train_test_split(split, cat_features, df_x, df_y)
+
+            _ = preprocessor.fit_transform(X_train)
+            X_train_ohe_features = set(
+                preprocessor.named_transformers_["cat"].named_steps['onehot'].get_feature_names(cat_features).tolist())
+            _ = preprocessor.fit_transform(X_test)
+            X_test_ohe_features = set(
+                preprocessor.named_transformers_["cat"].named_steps['onehot'].get_feature_names(cat_features).tolist())
+            are_sets_equal = X_train_ohe_features == X_test_ohe_features
+            if not are_sets_equal:
+                log.debug("Iteration counter: {}\nFeatures difference between train and test split: {}".
+                          format(count, X_train_ohe_features - X_test_ohe_features))
+            count = count + 1
+            if count == iter_limit:
+                raise TimeoutError("No train/test split was found with the same number of encoded features for "
+                                   "both the train and the test split after {} iterations.\n"
+                                   "Train split features: {}\n"
+                                   "Test split features: {}\n"
+                                   "The features that differ are: {}.".
+                                   format(count,
+                                          X_train_ohe_features,
+                                          X_test_ohe_features,
+                                          X_train_ohe_features - X_test_ohe_features))
+    else:
+        X_train, X_test, y_train, y_test = _get_train_test_split(split, cat_features, df_x, df_y)
+
+    return X_train, X_test, y_train, y_test
+
+
+def _get_train_test_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Series)\
         -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series):
     """
     Splits the data in train and test data taking the split type (balanced/imbalanced) in
@@ -163,10 +218,12 @@ def get_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Ser
                 categorical_cols=cat_features)
         return X_train_balanced, X_test_balanced, y_train_balanced, y_test_balanced
     elif split.type is SplitTypes.IMBALANCED:
+        random_number_split = randrange(100)
+        log.debug("Random number used for the train/test split: {}.".format(random_number_split))
         X_train, X_test, y_train, y_test = train_test_split(df_x,
                                                             df_y,
                                                             test_size=TEST_SPLIT_SIZE,
-                                                            random_state=RANDOM_NUMBER)
+                                                            random_state=random_number_split)
         return X_train, X_test, y_train, y_test
     else:
         raise NotImplementedError
@@ -215,7 +272,7 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
 
     model = get_pipeline(preprocessor, model_type.algorithm)
 
-    X_train, X_test, y_train, y_test = get_split(split, cat_features, df_x, df_y)
+    X_train, X_test, y_train, y_test = get_split(preprocessor, split, cat_features, df_x, df_y)
 
     # Now we can fit the model on the whole training set and calculate accuracy on the test set.
     model.fit(X_train, y_train)
