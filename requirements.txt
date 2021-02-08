@@ -11,7 +11,7 @@ defusedxml==0.6.0
 eli5==0.10.1
 entrypoints==0.3
 graphviz==0.13.2
-httplib2==0.18.1
+httplib2==0.19.0
 idna==2.9
 imageio==2.8.0
 ipykernel==5.2.0
