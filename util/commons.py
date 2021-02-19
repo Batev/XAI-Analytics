@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import logging as log
 import enum
+import time
+import math
 
 from functools import partial
 from random import choice, choices, randrange
@@ -328,8 +330,12 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
     X_train, X_test, y_train, y_test = get_split(preprocessor, split, cat_features, df_x, df_y)
     model = get_pipeline(preprocessor, model_type.algorithm, int(df_y.size))
 
+
+    start = time.time()
     # Now we can fit the model on the whole training set and calculate accuracy on the test set.
     model.fit(X_train, y_train)
+    end = time.time()
+    _log_elapsed_time(start, end, "training a {} classifier is".format(model_type.algorithm.name))
 
     # Generate predictions
     y_pred = model.predict(X_test)
@@ -551,6 +557,8 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
     plot = None
     log.info("Generating a feature importance plot using {} for {} ...".format(type.name, model.name))
 
+    start = time.time()
+
     if type == FeatureImportanceType.ELI5:
         if model.model_type.algorithm is Algorithm.SVC:
             log.warning("{} not is supported by {}.".format(model.model_type.algorithm.name, type))
@@ -566,6 +574,9 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
         plot_feature_importance_with_shap(model)
     else:
         log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+
+    end = time.time()
+    _log_elapsed_time(start, end, "generating a feature importance plot with {} is".format(type.name))
 
     return plot
 
@@ -603,8 +614,10 @@ def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str
     :return: None; TODO: return a plot.
     """
     plot = None
-
     log.info("Generating a PDP plot using {} for {} ...".format(type.name, model.name))
+
+    start = time.time()
+
     if type == PDPType.PDPBox:
         if feature2 == 'None':
             plot_single_pdp_with_pdpbox(model, feature1)
@@ -626,6 +639,9 @@ def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str
             plot_multi_pdp_with_shap(model, feature1, feature2)
     else:
         log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+
+    end = time.time()
+    _log_elapsed_time(start, end, "generating a PDP with {} is".format(type.name))
 
     return plot
 
@@ -829,6 +845,9 @@ def explain_single_instance(local_interpreter: LocalInterpreterType, model: Mode
     :return: An explanation
     """
     explanation = None
+    log.info("Generating a single instance explanation using {} for {} ...".format(local_interpreter.name, model.name))
+
+    start = time.time()
 
     if local_interpreter is LocalInterpreterType.LIME:
         if not model.lime_explainer:
@@ -841,6 +860,9 @@ def explain_single_instance(local_interpreter: LocalInterpreterType, model: Mode
     else:
         log.error("Interpreter type {} is not yet supported for local interpretations. Please either use another one"
                   "or extend the functionality of this function".format(local_interpreter))
+
+    end = time.time()
+    _log_elapsed_time(start, end, "generating a single instance explanation with {} is".format(local_interpreter.name))
 
     return explanation
 
@@ -880,7 +902,7 @@ def generate_single_instance_explanation(local_interpreter: LocalInterpreterType
     """
     Generate an explanation for a single instance (example) for a model with a given interpreter type.
     :param local_interpreter: Interpreter, that should be used
-    :param model: Model for whose decison an explanation shall be generated
+    :param model: Model for whose decision an explanation shall be generated
     :param example: Example, that should be explained
     :return: An explanation.
     """
@@ -905,7 +927,7 @@ def generate_single_instance_explanation(local_interpreter: LocalInterpreterType
 def generate_single_instance_explanation_with_lime(model: Model, example: int) -> str:
     """
     Generate an explanation for a single instance (example) for a model with LIME.
-    :param model: Model for whose decison an explanation shall be generated
+    :param model: Model for whose decision an explanation shall be generated
     :param example: Example, that should be explained
     :return: An explanation.
     """
@@ -1350,26 +1372,6 @@ def remove_model_features(model: Model) -> str:
     return msg
 
 
-def fill_empty_models(df_X: pd.DataFrame, df_y: pd.Series, number_of_models: int) -> (list, str):
-    """
-    A list of models will be created, where each model gets a name and the initial X and y of the dataset.
-    :param df_X: Dataframe containing all columns of the dataset excluding the target.
-    :param df_y: Series containing the target of the dataset.
-    :param number_of_models: How many models should be trained.
-    :return: (models, message) - Models is a list containing the all initial models to be trained, Message is a
-    log message indicating that the operation was successful.
-    """
-    models = []
-    _ensure_valid_dataset(df_X)
-
-    for m in range(number_of_models):
-        models.append(Model(m, "Model " + str(m+1), None, df_X, df_y, get_model_type(df_y)))
-
-    msg = "Models to be trained: \'{}\'.".format(number_of_models)
-    log.debug(msg)
-    return models, msg
-
-
 def _ensure_valid_dataset(df: pd.DataFrame):
     """
     Make sure that no categorical feature in the dataset has more than upper_bound unique values.
@@ -1390,6 +1392,76 @@ def _ensure_valid_dataset(df: pd.DataFrame):
                                   "Please preprocess your data and try again.".format(str(columns), upper_bound))
 
 
+def _log_elapsed_time(start, end, msg):
+    """
+    Logs the time elapsed during the execution of an operation.
+    The output looks as follows:
+    HH:MM:SS.MS
+    24:01:40.53
+    00:05:00.30
+    00:00:00.23
+    :param start: The time before the execution of the operation.
+    :param end: The time after the execution of the operation.
+    :param msg: Additional message to be displayed, e.g. the type of the operation.
+    :return: void
+    """
+    hours, rem = divmod(end - start, 3600)
+    minutes, seconds = divmod(rem, 60)
+    log.debug("The elapsed time for {} {:0>2}:{:0>2}:{:05.2f}".format(msg, int(hours), int(minutes), seconds))
+
+
+def _get_number_of_digits(n: int):
+    """
+    Returns the number of digits of a number.
+    :param n: The original number
+    :return: The number of digits
+    """
+    if n > 0:
+        digits = int(math.log10(n))+1
+    elif n == 0:
+        digits = 1
+    else:
+        digits = int(math.log10(-n))+1
+
+    return digits
+
+
+def _get_model_type(y: pd.Series) -> ModelType:
+    """
+    Get the model type (problem type) by the target feature.
+    :param y: The target feature for the model to be trained.
+    :return: The corresponding model type for this target.
+    """
+
+    model_type = None
+    if is_string_dtype(y) or len(y.unique()) == 2:
+        model_type = ModelType(ProblemType.CLASSIFICATION)
+    else:
+        model_type = ModelType(ProblemType.REGRESSION)
+
+    return model_type
+
+
+def fill_empty_models(df_X: pd.DataFrame, df_y: pd.Series, number_of_models: int) -> (list, str):
+    """
+    A list of models will be created, where each model gets a name and the initial X and y of the dataset.
+    :param df_X: Dataframe containing all columns of the dataset excluding the target.
+    :param df_y: Series containing the target of the dataset.
+    :param number_of_models: How many models should be trained.
+    :return: (models, message) - Models is a list containing the all initial models to be trained, Message is a
+    log message indicating that the operation was successful.
+    """
+    models = []
+    _ensure_valid_dataset(df_X)
+
+    for m in range(number_of_models):
+        models.append(Model(m, "Model " + str(m+1), None, df_X, df_y, _get_model_type(df_y)))
+
+    msg = "Models to be trained: \'{}\'.".format(number_of_models)
+    log.debug(msg)
+    return models, msg
+
+
 def fill_model(model: Model, algorithm=None, split=None) -> str:
     """
     A model is trained based on the properties selected by the user.
@@ -1398,9 +1470,6 @@ def fill_model(model: Model, algorithm=None, split=None) -> str:
     :param split: The split used for training the model.
     :return: String message about the status of the model that should be displayed as info.
     """
-    # split_type = model.split_type_dd.value
-    # split_feature = list(model.cross_columns_sm.value)
-
     if algorithm:
         model.model_type.algorithm = algorithm
     else:
@@ -1433,22 +1502,6 @@ def fill_model(model: Model, algorithm=None, split=None) -> str:
     return msg
 
 
-def get_model_type(y: pd.Series) -> ModelType:
-    """
-    Get the model type (problem type) by the target feature.
-    :param y: The target feature for the model to be trained.
-    :return: The corresponding model type for this target.
-    """
-
-    model_type = None
-    if is_string_dtype(y) or len(y.unique()) == 2:
-        model_type = ModelType(ProblemType.CLASSIFICATION)
-    else:
-        model_type = ModelType(ProblemType.REGRESSION)
-
-    return model_type
-
-
 def normalize_undefined_values(symbol: str, df: pd.DataFrame) -> pd.DataFrame:
     """
     Normalize (replace with 0.0) all rows containing undefined values
@@ -1467,4 +1520,4 @@ def remove_undefined_rows(symbol: str, df: pd.DataFrame) -> pd.DataFrame:
     :param df: The dataframe that has to be normalized
     :return: New dataframe without the undefined rows.
     """
-    return df.replace(symbol, float("NaN")).dropna()
+    return df.replace(symbol, float("NaN")).dropna().reset_index(drop=True)
