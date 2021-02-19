@@ -16,6 +16,7 @@ class Algorithm(enum.Enum):
     DECISION_TREE = 2
     RANDOM_FOREST = 3
     XGB = 4
+    SVC = 5
     # regression
     LINEAR_REGRESSION = 10
     SVM = 11
@@ -37,7 +38,7 @@ class ModelType:
         self._algorithm = None
         if new_value == ProblemType.CLASSIFICATION:
             self._algorithm_options = [Algorithm.LOGISTIC_REGRESSION.name, Algorithm.DECISION_TREE.name,
-                                       Algorithm.RANDOM_FOREST.name, Algorithm.XGB.name]
+                                       Algorithm.RANDOM_FOREST.name, Algorithm.XGB.name, Algorithm.SVC.name]
         elif new_value == ProblemType.REGRESSION:
             self._algorithm_options = [Algorithm.LINEAR_REGRESSION.name, Algorithm.SVM.name]
         else:

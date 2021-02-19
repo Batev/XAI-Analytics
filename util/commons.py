@@ -15,8 +15,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, r2_score, mean_squared_error
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -108,14 +108,14 @@ def get_column_transformer(numerical: list, categorical: list) -> ColumnTransfor
                     ('cat', categorical_transformer, categorical)])
 
 
-def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm) -> Pipeline:
+def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) -> Pipeline:
     """
     Returns a new pipeline depending on the chosen algorithm.
     :param ct: A column transformer used in the pipeline
-    :param algorithm: Algorithm that is then used for training the mdoel
+    :param algorithm: Algorithm that is then used for training the model
+    :param data_size: The size of the data used for training.
     :return: A new pipeline
     """
-
     if algorithm is Algorithm.LOGISTIC_REGRESSION:
         return Pipeline([("preprocessor", ct),
                          ("model",
@@ -124,19 +124,39 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm) -> Pipeline:
                                             random_state=RANDOM_NUMBER))])
     elif algorithm is Algorithm.DECISION_TREE:
         return Pipeline([("preprocessor", ct),
-                         ("model", DecisionTreeClassifier(class_weight="balanced"))])
+                         ("model",
+                          DecisionTreeClassifier(class_weight="balanced"))])
     elif algorithm is Algorithm.RANDOM_FOREST:
+        n_estimators = int(5 if _get_number_of_digits(data_size) < 4
+                           else math.pow(10, _get_number_of_digits(data_size)-3))
+        log.debug("Number of estimators for {}: {}".format(algorithm.name, n_estimators))
         return Pipeline([("preprocessor", ct),
-                         ("model", RandomForestClassifier(class_weight="balanced", n_estimators=100, n_jobs=-1))])
+                         ("model",
+                          RandomForestClassifier(class_weight="balanced",
+                                                 n_estimators=n_estimators,
+                                                 n_jobs=-1))])
     elif algorithm is Algorithm.XGB:
         return Pipeline([("preprocessor", ct),
-                         ("model", XGBClassifier(n_jobs=-1))])
+                         ("model",
+                          XGBClassifier(n_jobs=-1))])
+    elif algorithm is Algorithm.SVC:
+        return Pipeline([("preprocessor", ct),
+                         ("model",
+                          SVC(class_weight="balanced",
+                              # kernel="linear",
+                              # kernel="sigmoid",
+                              kernel="rbf",
+                              # kernel='poly',
+                              # degree=3,
+                              random_state=RANDOM_NUMBER,
+                              probability=True,
+                              verbose=False))])
     elif algorithm is Algorithm.LINEAR_REGRESSION:
         return Pipeline([("preprocessor", ct),
-                         ("model", LinearRegression(n_jobs=-1))])
+                         ("model",
+                          LinearRegression(n_jobs=-1))])
     elif algorithm is Algorithm.SVM:
-        return Pipeline([("preprocessor", ct),
-                         ("model", SVC(kernel='poly', degree=8))])
+        raise NotImplementedError
     else:
         raise NotImplementedError
 
@@ -271,9 +291,8 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
     # Transform the categorical features to numerical
     preprocessor = get_column_transformer(num_features, cat_features)
 
-    model = get_pipeline(preprocessor, model_type.algorithm)
-
     X_train, X_test, y_train, y_test = get_split(preprocessor, split, cat_features, df_x, df_y)
+    model = get_pipeline(preprocessor, model_type.algorithm, int(df_y.size))
 
     # Now we can fit the model on the whole training set and calculate accuracy on the test set.
     model.fit(X_train, y_train)
@@ -337,11 +356,18 @@ def generate_eli5_feature_importance_explanation(models: list, upper_bound: int 
 
     model_weight = {}
     for model in models:
-        weights = explain_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
+        weights = []
+        explanation = explain_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
         try:
-            weights = weights.targets[0].feature_weights.pos
-        except TypeError:
-            weights = weights.feature_importances.importances
+            weights = explanation.targets[0].feature_weights.pos
+        except TypeError as e:
+            try:
+                log.debug("An expected error occurred. Program execution may continue: {}".format(e))
+                weights = explanation.feature_importances.importances
+            except AttributeError as e:
+                log.debug("An expected error occurred. Program execution may continue: {}".format(e))
+                log.warning("{} not supported for ELI5 explanations.".format(model.model_type.algorithm.name))
+                continue
 
         feature_weight = {}
         for weight in weights:
@@ -492,7 +518,10 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
     log.info("Generating a feature importance plot using {} for {} ...".format(type.name, model.name))
 
     if type == FeatureImportanceType.ELI5:
-        plot = plot_feature_importance_with_eli5(model)
+        if model.model_type.algorithm is Algorithm.SVC:
+            log.warning("{} not is supported by {}.".format(model.model_type.algorithm.name, type))
+        else:
+            plot = plot_feature_importance_with_eli5(model)
     elif type == FeatureImportanceType.SKATER:
         if not model.skater_model or not model.skater_interpreter:
             model.init_skater()
