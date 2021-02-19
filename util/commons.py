@@ -36,12 +36,13 @@ RANDOM_NUMBER = randrange(100)
 TEST_SPLIT_SIZE = 0.3
 
 
-# Configure logger
 log.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
-# log.getLogger().setLevel(log.DEBUG)
 log.getLogger().setLevel(log.INFO)
 
-# Remove DataFrame display limitation
+# debug logger generates too much output
+log.getLogger('matplotlib.font_manager').disabled = True
+
+# remove DataFrame display limitation
 pd.set_option('display.max_columns', 50)
 
 
