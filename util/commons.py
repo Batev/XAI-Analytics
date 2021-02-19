@@ -182,7 +182,7 @@ def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list,
     X_train, X_test, y_train, y_test = pd.DataFrame(), pd.DataFrame(), pd.Series(), pd.Series()
 
     if cat_features:
-        iter_limit = 50
+        iter_limit = 100
         are_sets_equal = False
         count = 0
 
@@ -195,52 +195,86 @@ def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list,
             _ = preprocessor.fit_transform(X_test)
             X_test_ohe_features = set(
                 preprocessor.named_transformers_["cat"].named_steps['onehot'].get_feature_names(cat_features).tolist())
-            are_sets_equal = X_train_ohe_features == X_test_ohe_features
+            are_sets_equal = X_train_ohe_features == X_test_ohe_features and\
+                             np.array_equal(sorted(y_train.unique()), sorted(y_test.unique()))
             if not are_sets_equal:
-                log.debug("Iteration counter: {}\nFeatures difference between train and test split: {}".
-                          format(count, X_train_ohe_features - X_test_ohe_features))
+                log.debug("Iteration counter: {}\nFeatures difference between train and test split: {}.\n"
+                          "Unique target values for train split: {} and test split: {}".
+                          format(count,
+                                 X_train_ohe_features - X_test_ohe_features
+                                 if len(X_train_ohe_features) > len(X_test_ohe_features)
+                                 else X_test_ohe_features - X_train_ohe_features,
+                                 y_train.unique(),
+                                 y_test.unique()))
+
             count = count + 1
             if count == iter_limit:
                 raise TimeoutError("No train/test split was found with the same number of encoded features for "
                                    "both the train and the test split after {} iterations.\n"
                                    "Train split features: {}\n"
-                                   "Test split features: {}\n"
-                                   "The features that differ are: {}.".
-                                   format(count,
-                                          X_train_ohe_features,
-                                          X_test_ohe_features,
-                                          X_train_ohe_features - X_test_ohe_features))
+                                   "Test split features: {}\n".
+                                   format(count, X_train_ohe_features, X_test_ohe_features))
     else:
         X_train, X_test, y_train, y_test = _get_train_test_split(split, cat_features, df_x, df_y)
 
     return X_train, X_test, y_train, y_test
 
 
-def _get_train_test_split(split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Series)\
+def _get_train_test_split(split: Split, cat_features: list, df_X: pd.DataFrame, df_y: pd.Series)\
         -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series):
     """
-    Splits the data in train and test data taking the split type (balanced/imbalanced) in
-    consideration.
-    :param split: Whether a balanced or imbalanced split shall be used. If balanced split is used
-    a feature for the split shall be selected
-    :param cat_features: The categorical features of the dataset
-    :param df_x: Dataset features
-    :param df_y: Dataset target
-    :return: X_train, X_test, y_train, y_test
+    Splits the data into train and test.
+    If we use the imbalanced split option, then the data will not be balanced (down-/upsampled) on
+    any feature and will be split as it is.
+    If a balanced split option is selected and a feature or a list of features is available,
+    the data will be sampled in such a way that there is an equal number of samples for each
+    category of the features.
+    If a balanced split option is selected and not additional features, an upsampling technique
+    will be applied trying to balance the target (y). Either SMOTENC or ADASYN algorithm will
+    be used depending on the features type.
+    :param split: Whether the data should be down-/upsampled before the split
+    :param cat_features: The categorical features of this dataset
+    :param df_X: Dataset features (X)
+    :param df_y: Dataset target (y)
+    :return: (X_train, X_test, y_train, y_test)
     """
-
+    from functools import reduce
     if split.type is SplitTypes.BALANCED:
-        X_train_balanced, y_train_balanced, X_test_balanced, y_test_balanced, train_idx, test_idx =\
-            balanced_train_test_split(
-                df_x, df_y, *split.value,
-                min_per_group=300,
-                max_per_group=300,
-                categorical_cols=cat_features)
-        return X_train_balanced, X_test_balanced, y_train_balanced, y_test_balanced
+        if split.value is None:
+            random_number_split = randrange(100)
+            log.debug("Random number used for the train/test split: {}.".format(random_number_split))
+            X_train, X_test, y_train, y_test = train_test_split(df_X,
+                                                                df_y,
+                                                                stratify=df_y,
+                                                                test_size=TEST_SPLIT_SIZE,
+                                                                random_state=random_number_split)
+            if cat_features:
+                from imblearn.over_sampling import SMOTENC
+                X_resampled_train, y_resampled_train = \
+                    SMOTENC(categorical_features=sorted([list(df_X.columns).index(f) for f in cat_features]),
+                            random_state=RANDOM_NUMBER).fit_resample(X_train, y_train)
+            else:
+                from imblearn.over_sampling import ADASYN
+                X_resampled_train, y_resampled_train = ADASYN().fit_resample(X_train, y_train)
+            return X_resampled_train, X_test, y_resampled_train, y_test
+        else:
+            max_per_group = int(df_y.size/
+                                (reduce(lambda a, b: a + b,
+                                        list(map(lambda x: len(df_X[x].unique()), cat_features)))*len(df_y.unique())))-1
+            X_train_balanced, y_train_balanced, X_test_balanced, y_test_balanced, train_idx, test_idx =\
+                balanced_train_test_split(
+                    df_X, df_y, *split.value,
+                    min_per_group=int(max_per_group/10),
+                    max_per_group=max_per_group,
+                    categorical_cols=cat_features)
+            return X_train_balanced,\
+                   X_test_balanced,\
+                   pd.Series(data=y_train_balanced, name=df_y.name),\
+                   pd.Series(data=y_test_balanced, name=df_y.name)
     elif split.type is SplitTypes.IMBALANCED:
         random_number_split = randrange(100)
         log.debug("Random number used for the train/test split: {}.".format(random_number_split))
-        X_train, X_test, y_train, y_test = train_test_split(df_x,
+        X_train, X_test, y_train, y_test = train_test_split(df_X,
                                                             df_y,
                                                             stratify=df_y,
                                                             test_size=TEST_SPLIT_SIZE,
