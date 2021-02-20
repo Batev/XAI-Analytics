@@ -623,7 +623,11 @@ def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str
         if feature2 == 'None':
             plot_single_pdp_with_pdpbox(model, feature1)
         else:
-            plot_multi_pdp_with_pdpbox(model, feature1, feature2)
+            try:
+                plot_multi_pdp_with_pdpbox(model, feature1, feature2)
+            except TypeError as e:
+                # known issue: https://github.com/SauceCat/PDPbox/issues/40
+                log.debug("An expected error occurred. Program execution may continue: {}".format(e))
     elif type == PDPType.SKATER:
         if not model.skater_model or not model.skater_interpreter:
             model.init_skater()
