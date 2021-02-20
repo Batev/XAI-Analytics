@@ -271,7 +271,8 @@ class Model:
             self.skater_model = InMemoryModel(
                 self.model[1].predict_proba,
                 examples=self.X_test_ohe,
-                target_names=target_names)
+                target_names=target_names,
+                unique_values=self.y_train.unique())
         else:
             log.info("Skater is already initialized.")
 
