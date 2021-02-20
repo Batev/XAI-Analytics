@@ -25,7 +25,11 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
         # Start a virtual environment, e.g. venv - path to virtual environment
         $> source /venv/bin/activate
         # Install project requirements
-        $> pip3 install -r /path/to/requirements.txt
+        $> pip3 install -r requirements.txt
+        # Skater depends on wordcloud==1.3.1, whose installation is erroneous when installed with pip, therefore skater is excluded from the requirements file and has to be installed manually without dependencies. 
+        $> pip3 install skater --no-dependencies --no-cache-dir
+        # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
+        $> find -name 'tree_visualizer.py' -exec sed -i 's/from sklearn.externals.six import StringIO/from six import StringIO/g' {} +
         # Start notebook server
         $> jupyter notebook
         ```
@@ -36,7 +40,11 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
         # Start a virtual environment, e.g. venv - path to virtual environment
         $> .\venv\Scripts\activate
         # Install project requirements
-        $> pip install -r /path/to/requirements.txt
+        $> pip install -r requirements.txt
+        # Skater depends on wordcloud==1.3.1, whose installation is erroneous when installed with pip, therefore skater is excluded from the requirements file and has to be installed manually without dependencies.  
+        $> pip install skater --no-dependencies --no-cache-dir
+        # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
+        $> get-content Lib\site-packages\skater-1.1.2-py3.8.egg\skater\core\visualizer\tree_visualizer.py | %{$_ -replace "from sklearn.externals.six","import StringIO/from six import StringIO"}
         # Start notebook server
         $> jupyter notebook
         ```
