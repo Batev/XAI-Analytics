@@ -14,7 +14,6 @@ multiprocess>=0.70.11.1
 nltk==3.5
 pandoc==1.0.2
 PDPbox==0.2.0
-pkg-resources==0.0.0
 pydotplus==2.0.2
 requests==2.25.1
 shap==0.38.1
