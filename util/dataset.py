@@ -5,7 +5,6 @@ import logging as log
 
 from statsmodels.api import datasets
 from io import StringIO
-from xai.data import load_census
 from urllib.request import urlopen
 from shutil import copyfileobj
 
@@ -202,6 +201,7 @@ class Dataset:
             cmd = "datasets.{}.load_pandas().data".format(id.name)
             return eval(cmd)
         elif id.value == 27:
+            from xai.data import load_census
             return load_census()
         elif id.value == 28:
             return Dataset.from_url(

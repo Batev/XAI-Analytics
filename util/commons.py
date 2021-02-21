@@ -9,7 +9,6 @@ from functools import partial
 from random import choice, choices, randrange
 from matplotlib import figure, axes
 from IPython import display
-from xai import balanced_train_test_split
 from eli5 import show_weights, explain_weights
 from shap import summary_plot, dependence_plot, force_plot
 from sklearn.compose import ColumnTransformer
@@ -261,6 +260,7 @@ def _get_train_test_split(split: Split, cat_features: list, df_X: pd.DataFrame, 
                 X_resampled_train, y_resampled_train = ADASYN().fit_resample(X_train, y_train)
             return X_resampled_train, X_test, y_resampled_train, y_test
         else:
+            from xai import balanced_train_test_split
             max_per_group = int(df_y.size/
                                 (reduce(lambda a, b: a + b,
                                         list(map(lambda x: len(df_X[x].unique()), cat_features)))*len(df_y.unique())))-1
