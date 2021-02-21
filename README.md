@@ -9,12 +9,12 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
 
 ## Getting started
 
-### Run Notebook online on _binder_
+### Run on _binder_
 
 1. Start the binder notebook server by clicking [here](https://mybinder.org/v2/gh/Batev/XAI-Analytics/master) 
 2. Run *XAI-Analytics.ipynb* notebook file
 
-### Run Notebook locally
+### <a name="run-locally"></a>Run locally
 
 1. Clone the **XAI-Analytics** repository: https://github.com/Batev/XAI-Analytics.git
 1. Navigate to checkout directory in _Bash_ or _Powershell_ and ...
@@ -25,7 +25,7 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
         # Start a virtual environment, e.g. venv - path to virtual environment
         $> source /venv/bin/activate
         # Install project requirements
-        $> pip3 install -r requirements.txt
+        $> pip3 install -r requirements.txt.local
         # Skater depends on wordcloud==1.3.1, whose installation is erroneous when installed with pip, therefore skater is excluded from the requirements file and has to be installed manually without dependencies. 
         $> pip3 install skater --no-dependencies --no-cache-dir
         # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
@@ -40,7 +40,7 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
         # Start a virtual environment, e.g. venv - path to virtual environment
         $> .\venv\Scripts\activate
         # Install project requirements
-        $> pip install -r requirements.txt
+        $> pip install -r requirements.txt.local
         # Skater depends on wordcloud==1.3.1, whose installation is erroneous when installed with pip, therefore skater is excluded from the requirements file and has to be installed manually without dependencies.  
         $> pip install skater --no-dependencies --no-cache-dir
         # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
@@ -54,7 +54,7 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
 
 ## Prerequisites
 
-Please refer to the [requirements file](requirements.txt) for a full list of the prerequisites.
+Please refer to the [requirements file](requirements.txt) for a list of the prerequisites. The file excludes [XAI](https://github.com/EthicalML/xai) and [Skater](https://github.com/oracle/Skater) because of incompatible versions in the dependencies when started with [binder](https://mybinder.org/). The [requirements.txt](requirements.txt) is auto-generated from [requirements.in](requirements.in) (which consists of the raw dependencies) using [pip-compile](https://github.com/jazzband/pip-tools). For using locally with all required modules please refer to the [Run locally](#run-locally) step.
 
 ## Goals of XAI-Analytics 1.0
 
@@ -84,7 +84,7 @@ Example notebooks can be found in [examples](https://github.com/Batev/XAI-Analyt
 ## Known Issues
 
 * ~~Error when training a model on a dataset without any *categorical* columns (or only one categorical column that is the target)~~ -> Fixed by [b87a276](https://github.com/Batev/XAI-Analytics/commit/b87a2769cc3e817be45c39f95321a0bd0873d5b2).
-* Internal *PDPBox* error when plotting a PDP: https://github.com/SauceCat/PDPbox/issues/40
+* ~~Internal *PDPBox* error when plotting a PDP: https://github.com/SauceCat/PDPbox/issues/40~~ -> Workaround by [6143001](https://github.com/Batev/XAI-Analytics/commit/61430014c91ee6a69e26930fec6d9b20693fe321).
 * *Skater* cannot be installed with *pip*: https://github.com/amueller/word_cloud/issues/134
 * Not all interpretation techniques work with *XGBoost*.
 
