@@ -1,0 +1,26 @@
+bs4
+Cython
+dask
+dill
+ds-lime
+eli5
+httplib2
+imblearn
+jupyter
+lime
+matplotlib
+multipledispatch
+multiprocess
+nltk
+pandoc
+PDPbox
+pydotplus
+requests
+# skater
+shap
+statsmodels
+toolz
+wheel
+wordcloud
+# xai
+xgboost
