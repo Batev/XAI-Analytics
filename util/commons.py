@@ -7,13 +7,14 @@ import math
 
 from functools import partial
 from random import choice, choices, randrange
-from matplotlib import figure, axes
+from matplotlib import figure, axes, pyplot as plt
 from IPython import display
 from eli5 import show_weights, explain_weights
 from shap import summary_plot, dependence_plot, force_plot
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report, r2_score, mean_squared_error
+from sklearn.metrics import accuracy_score, classification_report, r2_score,\
+    mean_squared_error, plot_confusion_matrix, plot_roc_curve
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
@@ -331,7 +332,6 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
     X_train, X_test, y_train, y_test = get_split(preprocessor, split, cat_features, df_x, df_y)
     model = get_pipeline(preprocessor, model_type.algorithm, int(df_y.size))
 
-
     start = time.time()
     # Now we can fit the model on the whole training set and calculate accuracy on the test set.
     model.fit(X_train, y_train)
@@ -345,6 +345,14 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
     if model_type.problem_type == ProblemType.CLASSIFICATION:
         log.info("Model accuracy: {}".format(accuracy_score(y_test, y_pred)))
         log.info("Classification report: \n{}".format(classification_report(y_test, y_pred)))
+        # plot confusion matrix and roc curve
+        fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(14, 5))
+        ax1.set_title("Confusion Matrix")
+        ax2.set_title("ROC Curve")
+        plot_confusion_matrix(model, X_test, y_test, ax=ax1)
+        plot_roc_curve(model, X_test, y_test, ax=ax2)
+        fig.tight_layout()
+        plt.show()
     # regression
     elif model_type.problem_type == ProblemType.REGRESSION:
         log.info("R2 score : %.2f" % r2_score(y_test, y_pred))
