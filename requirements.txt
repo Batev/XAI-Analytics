@@ -202,7 +202,7 @@ parso==0.8.1
     # via jedi
 patsy==0.5.1
     # via statsmodels
-pdpbox==0.2.0
+pdpbox==0.2.1
     # via -r requirements.in
 pexpect==4.8.0
     # via ipython
