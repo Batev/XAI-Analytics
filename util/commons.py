@@ -32,7 +32,7 @@ from util.model import Algorithm, Model, ModelType, ProblemType
 from util.split import Split, SplitTypes
 
 
-RANDOM_NUMBER = randrange(100)
+RANDOM_NUMBER = None
 TEST_SPLIT_SIZE = 0.3
 
 
@@ -188,9 +188,10 @@ def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list,
         iter_limit = 100
         are_sets_equal = False
         count = 0
+        random_number = None
 
         while not are_sets_equal:
-            X_train, X_test, y_train, y_test = _get_train_test_split(split, cat_features, df_x, df_y)
+            X_train, X_test, y_train, y_test, random_number = _get_train_test_split(split, cat_features, df_x, df_y)
 
             _ = preprocessor.fit_transform(X_train)
             X_train_ohe_features = set(
@@ -214,17 +215,21 @@ def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list,
             if count == iter_limit:
                 raise TimeoutError("No train/test split was found with the same number of encoded features for "
                                    "both the train and the test split after {} iterations.\n"
-                                   "Train split features: {}\n"
-                                   "Test split features: {}\n".
-                                   format(count, X_train_ohe_features, X_test_ohe_features))
+                                   "Features that differ: {}\n".
+                                   format(count, X_train_ohe_features - X_test_ohe_features
+                                 if len(X_train_ohe_features) > len(X_test_ohe_features)
+                                 else X_test_ohe_features - X_train_ohe_features,
+                                 y_train.unique(),
+                                 y_test.unique()))
     else:
-        X_train, X_test, y_train, y_test = _get_train_test_split(split, cat_features, df_x, df_y)
+        X_train, X_test, y_train, y_test, random_number = _get_train_test_split(split, cat_features, df_x, df_y)
 
+    _set_random_number(random_number=random_number)
     return X_train, X_test, y_train, y_test
 
 
 def _get_train_test_split(split: Split, cat_features: list, df_X: pd.DataFrame, df_y: pd.Series)\
-        -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series):
+        -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, int):
     """
     Splits the data into train and test.
     If we use the imbalanced split option, then the data will not be balanced (down-/upsampled) on
@@ -239,28 +244,29 @@ def _get_train_test_split(split: Split, cat_features: list, df_X: pd.DataFrame, 
     :param cat_features: The categorical features of this dataset
     :param df_X: Dataset features (X)
     :param df_y: Dataset target (y)
-    :return: (X_train, X_test, y_train, y_test)
+    :return: (X_train, X_test, y_train, y_test, random_number (seed used for the train/test split))
     """
-    from functools import reduce
+    random_number = _get_random_number()
+
     if split.type is SplitTypes.BALANCED:
-        if split.value is None:
-            random_number_split = randrange(100)
-            log.debug("Random number used for the train/test split: {}.".format(random_number_split))
+        if not split.value:
             X_train, X_test, y_train, y_test = train_test_split(df_X,
                                                                 df_y,
                                                                 stratify=df_y,
                                                                 test_size=TEST_SPLIT_SIZE,
-                                                                random_state=random_number_split)
+                                                                random_state=random_number)
             if cat_features:
                 from imblearn.over_sampling import SMOTENC
                 X_resampled_train, y_resampled_train = \
                     SMOTENC(categorical_features=sorted([list(df_X.columns).index(f) for f in cat_features]),
-                            random_state=RANDOM_NUMBER).fit_resample(X_train, y_train)
+                            random_state=random_number).fit_resample(X_train, y_train)
             else:
                 from imblearn.over_sampling import ADASYN
-                X_resampled_train, y_resampled_train = ADASYN().fit_resample(X_train, y_train)
-            return X_resampled_train, X_test, y_resampled_train, y_test
+                X_resampled_train, y_resampled_train = \
+                    ADASYN(random_state=random_number).fit_resample(X_train, y_train)
+            return X_resampled_train, X_test, y_resampled_train, y_test, random_number
         else:
+            from functools import reduce
             from xai import balanced_train_test_split
             max_per_group = int(df_y.size/
                                 (reduce(lambda a, b: a + b,
@@ -271,21 +277,54 @@ def _get_train_test_split(split: Split, cat_features: list, df_X: pd.DataFrame, 
                     min_per_group=int(max_per_group/10),
                     max_per_group=max_per_group,
                     categorical_cols=cat_features)
+
             return X_train_balanced,\
                    X_test_balanced,\
                    pd.Series(data=y_train_balanced, name=df_y.name),\
-                   pd.Series(data=y_test_balanced, name=df_y.name)
-    elif split.type is SplitTypes.IMBALANCED:
-        random_number_split = randrange(100)
-        log.debug("Random number used for the train/test split: {}.".format(random_number_split))
+                   pd.Series(data=y_test_balanced, name=df_y.name),\
+                   random_number
+    elif split.type is SplitTypes.NORMAL:
         X_train, X_test, y_train, y_test = train_test_split(df_X,
                                                             df_y,
                                                             stratify=df_y,
                                                             test_size=TEST_SPLIT_SIZE,
-                                                            random_state=random_number_split)
-        return X_train, X_test, y_train, y_test
+                                                            random_state=random_number)
+        return X_train, X_test, y_train, y_test, random_number
     else:
         raise NotImplementedError
+
+
+def _get_random_number() -> int:
+    """
+    Get the value of the random seed/state used for the train/test splits and passed to the external modules.
+    If the value of the global variable is not set a new random number with a positive value
+     lower than 100 will be returned.
+    return: A random number [0;100)
+    """
+
+    if RANDOM_NUMBER:
+        random_number = RANDOM_NUMBER
+    else:
+        random_number = randrange(100)
+    log.debug("Random number used for the train/test split: {}.".format(random_number))
+
+    return random_number
+
+
+def _set_random_number(random_number: int):
+    """
+    Set the value of the global RANDOM_NUMBER variable. This variable makes sure that all of the models use the same
+    train/test split when trained.
+    :param random_number: The new value for the global variable.
+    :return: void
+    """
+    global RANDOM_NUMBER
+    if not RANDOM_NUMBER:
+        RANDOM_NUMBER = random_number
+        log.debug("Value of RANDOM_NUMBER is set to {0}".format(random_number))
+    else:
+        log.debug("Trying to change the value of a constant variable RANDOM_NUMBER from {0} to {1}."
+                  .format(RANDOM_NUMBER, random_number))
 
 
 def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
