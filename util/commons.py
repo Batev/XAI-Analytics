@@ -1317,7 +1317,7 @@ def change_cross_columns_status(model: Model, new_value: str) -> str:
     if new_value == SplitTypes.BALANCED.name:
         model.cross_columns_sm.disabled = False
         msg = msg + "enabled."
-    elif new_value == SplitTypes.IMBALANCED.name:
+    elif new_value == SplitTypes.NORMAL.name:
         model.cross_columns_sm.disabled = True
         msg = msg + "disabled."
 
