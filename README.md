@@ -22,8 +22,10 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
     * Unix
 
         ```bash
-        # Start a virtual environment, e.g. venv - path to virtual environment
-        $> source /venv/bin/activate
+        # (Optional) Create a new virtual environment 
+        $> python3 -m venv venv
+        # Start the virtual environment, e.g. venv
+        $> source venv/bin/activate
         # Install project requirements
         $> pip3 install -r requirements.txt.local
         # Skater depends on wordcloud==1.3.1, whose installation is erroneous when installed with pip, therefore skater is excluded from the requirements file and has to be installed manually without dependencies. 
@@ -37,7 +39,9 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
     * Windows
 
         ```powershell
-        # Start a virtual environment, e.g. venv - path to virtual environment
+        # (Optional) Create a new virtual environment 
+        $> python -m venv venv
+        # Start the virtual environment, e.g. venv
         $> .\venv\Scripts\activate
         # Install project requirements
         $> pip install -r requirements.txt.local
