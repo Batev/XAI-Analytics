@@ -4,45 +4,45 @@
 #
 #    pip-compile requirements.in
 #
-argon2-cffi==20.1.0
+argon2-cffi==21.1.0
     # via notebook
 async-generator==1.10
     # via nbclient
-attrs==20.3.0
+attrs==21.2.0
     # via
     #   eli5
     #   jsonschema
 backcall==0.2.0
     # via ipython
-beautifulsoup4==4.9.3
+beautifulsoup4==4.10.0
     # via bs4
-bleach==3.3.0
+bleach==4.1.0
     # via nbconvert
 bs4==0.0.1
     # via -r requirements.in
-certifi==2020.12.5
+certifi==2021.10.8
     # via requests
-cffi==1.14.5
+cffi==1.15.0
     # via argon2-cffi
 chardet==4.0.0
     # via requests
-click==7.1.2
+click==8.0.3
     # via nltk
-cloudpickle==1.6.0
+cloudpickle==2.0.0
     # via shap
 cycler==0.10.0
     # via matplotlib
-cython==0.29.22
+cython==0.29.24
     # via -r requirements.in
-dask==2021.2.0
+dask==2021.9.1
     # via -r requirements.in
-decorator==4.4.2
+decorator==5.1.0
     # via
     #   ipython
     #   networkx
-defusedxml==0.6.0
+defusedxml==0.7.1
     # via nbconvert
-dill==0.3.3
+dill==0.3.4
     # via
     #   -r requirements.in
     #   multiprocess
@@ -52,19 +52,19 @@ eli5==0.11.0
     # via -r requirements.in
 entrypoints==0.3
     # via nbconvert
-graphviz==0.16
+graphviz==0.17
     # via eli5
-httplib2==0.19.0
+httplib2==0.20.1
     # via -r requirements.in
-idna==2.10
+idna==3.3
     # via requests
 imageio==2.9.0
     # via scikit-image
-imbalanced-learn==0.8.0
+imbalanced-learn==0.8.1
     # via imblearn
 imblearn==0.0
     # via -r requirements.in
-ipykernel==5.5.0
+ipykernel==6.4.2
     # via
     #   ipywidgets
     #   jupyter
@@ -77,38 +77,38 @@ ipython-genutils==0.2.0
     #   notebook
     #   qtconsole
     #   traitlets
-ipython==7.20.0
+ipython==7.28.0
     # via
     #   ipykernel
     #   ipywidgets
     #   jupyter-console
-ipywidgets==7.6.3
+ipywidgets==7.6.5
     # via jupyter
 jedi==0.18.0
     # via ipython
-jinja2==2.11.3
+jinja2==3.0.2
     # via
     #   eli5
     #   nbconvert
     #   notebook
-joblib==1.0.1
+joblib==1.1.0
     # via
     #   imbalanced-learn
     #   nltk
     #   pdpbox
     #   scikit-learn
-jsonschema==3.2.0
+jsonschema==4.1.2
     # via nbformat
-jupyter-client==6.1.11
+jupyter-client==7.0.6
     # via
     #   ipykernel
     #   jupyter-console
     #   nbclient
     #   notebook
     #   qtconsole
-jupyter-console==6.2.0
+jupyter-console==6.4.0
     # via jupyter
-jupyter-core==4.7.1
+jupyter-core==4.8.1
     # via
     #   jupyter-client
     #   nbconvert
@@ -119,18 +119,19 @@ jupyter==1.0.0
     # via -r requirements.in
 jupyterlab-pygments==0.1.2
     # via nbconvert
-jupyterlab-widgets==1.0.0
+jupyterlab-widgets==1.0.2
     # via ipywidgets
-kiwisolver==1.3.1
+kiwisolver==1.3.2
     # via matplotlib
 lime==0.2.0.1
     # via -r requirements.in
-llvmlite==0.35.0
+llvmlite==0.37.0
     # via numba
-markupsafe==1.1.1
+markupsafe==2.0.1
     # via jinja2
-matplotlib==3.3.4
-    # via
+matplotlib==3.2.2
+    # do not upgrade this version -> https://stackoverflow.com/questions/62953704/valueerror-the-number-of-fixedlocator-locations-5-usually-from-a-call-to-set
+    # via 
     #   -r requirements.in
     #   lime
     #   pdpbox
@@ -140,15 +141,15 @@ mistune==0.8.4
     # via nbconvert
 multipledispatch==0.6.0
     # via -r requirements.in
-multiprocess==0.70.11.1
+multiprocess==0.70.12.2
     # via -r requirements.in
-nbclient==0.5.2
+nbclient==0.5.4
     # via nbconvert
-nbconvert==6.0.7
+nbconvert==6.2.0
     # via
     #   jupyter
     #   notebook
-nbformat==5.1.2
+nbformat==5.1.3
     # via
     #   ipywidgets
     #   nbclient
@@ -156,17 +157,18 @@ nbformat==5.1.2
     #   notebook
 nest-asyncio==1.5.1
     # via nbclient
-networkx==2.5
+networkx==2.6.3
     # via scikit-image
-nltk==3.5
+nltk==3.6.5
     # via -r requirements.in
-notebook==6.2.0
+notebook==6.4.5
     # via
     #   jupyter
     #   widgetsnbextension
-numba==0.52.0
+numba==0.54.1
     # via shap
-numpy==1.20.1
+numpy==1.20.0
+    # do not upgrade this version -> Numba 0.54.1 needs NumPy 1.20 or less
     # via
     #   ds-lime
     #   eli5
@@ -187,20 +189,20 @@ numpy==1.20.1
     #   tifffile
     #   wordcloud
     #   xgboost
-packaging==20.9
+packaging==21.0
     # via bleach
-pandas==1.2.2
+pandas==1.3.4
     # via
     #   pdpbox
     #   shap
     #   statsmodels
-pandoc==1.0.2
+pandoc==1.1.0
     # via -r requirements.in
-pandocfilters==1.4.3
+pandocfilters==1.5.0
     # via nbconvert
-parso==0.8.1
+parso==0.8.2
     # via jedi
-patsy==0.5.1
+patsy==0.5.2
     # via statsmodels
 pdpbox==0.2.1
     # via -r requirements.in
@@ -208,7 +210,7 @@ pexpect==4.8.0
     # via ipython
 pickleshare==0.7.5
     # via ipython
-pillow==8.1.0
+pillow==8.4.0
     # via
     #   imageio
     #   matplotlib
@@ -216,9 +218,9 @@ pillow==8.1.0
     #   wordcloud
 ply==3.11
     # via pandoc
-prometheus-client==0.9.0
+prometheus-client==0.11.0
     # via notebook
-prompt-toolkit==3.0.16
+prompt-toolkit==3.0.20
     # via
     #   ipython
     #   jupyter-console
@@ -232,7 +234,7 @@ pycparser==2.20
     # via cffi
 pydotplus==2.0.2
     # via -r requirements.in
-pygments==2.8.0
+pygments==2.10.0
     # via
     #   ipython
     #   jupyter-console
@@ -245,35 +247,35 @@ pyparsing==2.4.7
     #   matplotlib
     #   packaging
     #   pydotplus
-pyrsistent==0.17.3
+pyrsistent==0.18.0
     # via jsonschema
-python-dateutil==2.8.1
+python-dateutil==2.8.2
     # via
     #   jupyter-client
     #   matplotlib
     #   pandas
-pytz==2021.1
+pytz==2021.3
     # via pandas
 pywavelets==1.1.1
     # via scikit-image
-pyyaml==5.4.1
+pyyaml==6.0
     # via dask
-pyzmq==22.0.3
+pyzmq==22.3.0
     # via
     #   jupyter-client
     #   notebook
     #   qtconsole
-qtconsole==5.0.2
+qtconsole==5.1.1
     # via jupyter
-qtpy==1.9.0
+qtpy==1.11.2
     # via qtconsole
-regex==2020.11.13
+regex==2021.10.8
     # via nltk
-requests==2.25.1
+requests==2.26.0
     # via -r requirements.in
-scikit-image==0.18.1
+scikit-image==0.18.3
     # via lime
-scikit-learn==0.24.1
+scikit-learn==1.0
     # via
     #   ds-lime
     #   eli5
@@ -281,7 +283,7 @@ scikit-learn==0.24.1
     #   lime
     #   pdpbox
     #   shap
-scipy==1.6.1
+scipy==1.7.1
     # via
     #   ds-lime
     #   eli5
@@ -293,11 +295,11 @@ scipy==1.6.1
     #   shap
     #   statsmodels
     #   xgboost
-send2trash==1.5.0
+send2trash==1.8.0
     # via notebook
-shap==0.38.1
+shap==0.40.0
     # via -r requirements.in
-six==1.15.0
+six==1.16.0
     # via
     #   argon2-cffi
     #   bleach
@@ -309,19 +311,19 @@ six==1.15.0
     #   python-dateutil
 slicer==0.0.7
     # via shap
-soupsieve==2.2
+soupsieve==2.2.1
     # via beautifulsoup4
-statsmodels==0.12.2
+statsmodels==0.13.0
     # via -r requirements.in
-tabulate==0.8.8
+tabulate==0.8.9
     # via eli5
-terminado==0.9.2
+terminado==0.12.1
     # via notebook
-testpath==0.4.4
+testpath==0.5.0
     # via nbconvert
-threadpoolctl==2.1.0
+threadpoolctl==3.0.0
     # via scikit-learn
-tifffile==2021.2.1
+tifffile==2021.10.12
     # via scikit-image
 toolz==0.11.1
     # via -r requirements.in
@@ -331,12 +333,12 @@ tornado==6.1
     #   jupyter-client
     #   notebook
     #   terminado
-tqdm==4.57.0
+tqdm==4.62.3
     # via
     #   lime
     #   nltk
     #   shap
-traitlets==5.0.5
+traitlets==5.1.0
     # via
     #   ipykernel
     #   ipython
@@ -348,19 +350,19 @@ traitlets==5.0.5
     #   nbformat
     #   notebook
     #   qtconsole
-urllib3==1.26.3
+urllib3==1.26.7
     # via requests
 wcwidth==0.2.5
     # via prompt-toolkit
 webencodings==0.5.1
     # via bleach
-wheel==0.36.2
+wheel==0.37.0
     # via -r requirements.in
 widgetsnbextension==3.5.1
     # via ipywidgets
 wordcloud==1.8.1
     # via -r requirements.in
-xgboost==1.3.3
+xgboost==1.5.0
     # via -r requirements.in
 
 # The following packages are considered to be unsafe in a requirements file:

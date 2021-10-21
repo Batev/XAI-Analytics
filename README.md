@@ -27,11 +27,11 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
         # Start the virtual environment, e.g. venv
         $> source venv/bin/activate
         # Install project requirements
-        $> pip3 install -r requirements.txt.local
-        # Skater depends on wordcloud==1.3.1, whose installation is erroneous when installed with pip, therefore skater is excluded from the requirements file and has to be installed manually without dependencies. 
-        $> pip3 install skater --no-dependencies --no-cache-dir
+        $> pip3 install -r requirements.txt
+        # Modules with outdated dependencies (e.g. Skater on wordcloud==1.3.1), that are erroneous when installed with pip. 
+        $> pip3 install --no-dependencies --no-cache-dir -r requirements-no-deps.txt 
         # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
-        $> find -name 'tree_visualizer.py' -exec sed -i 's/from sklearn.externals.six import StringIO/from six import StringIO/g' {} +
+        $> find . -name 'tree_visualizer.py' -exec sed -i 's/from sklearn.externals.six import StringIO/from six import StringIO/g' {} +
         # Start notebook server
         $> jupyter notebook
         ```
@@ -44,9 +44,9 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
         # Start the virtual environment, e.g. venv
         $> .\venv\Scripts\activate
         # Install project requirements
-        $> pip install -r requirements.txt.local
-        # Skater depends on wordcloud==1.3.1, whose installation is erroneous when installed with pip, therefore skater is excluded from the requirements file and has to be installed manually without dependencies.  
-        $> pip install skater --no-dependencies --no-cache-dir
+        $> pip install -r requirements.txt
+        # Modules with outdated dependencies (e.g. Skater on wordcloud==1.3.1), that are erroneous when installed with pip.  
+        $> pip install --no-dependencies --no-cache-dir -r requirements-no-deps.txt
         # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
         $> get-content Lib\site-packages\skater-1.1.2-py3.8.egg\skater\core\visualizer\tree_visualizer.py | %{$_ -replace "from sklearn.externals.six","import StringIO/from six import StringIO"}
         # Start notebook server
