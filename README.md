@@ -47,8 +47,8 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
         $> pip install -r requirements.txt
         # Modules with outdated dependencies (e.g. Skater on wordcloud==1.3.1), that are erroneous when installed with pip.  
         $> pip install --no-dependencies --no-cache-dir -r requirements-no-deps.txt
-        # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
-        $> get-content Lib\site-packages\skater-1.1.2-py3.8.egg\skater\core\visualizer\tree_visualizer.py | %{$_ -replace "from sklearn.externals.six","import StringIO/from six import StringIO"}
+        # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary (example for Python 3.8.4). 
+        $> ((Get-Content -path venv\Lib\site-packages\skater-1.1.2-py3.8.egg\skater\core\visualizer\tree_visualizer.py -Raw) -replace 'from sklearn.externals.six import StringIO','from six import StringIO') | Set-Content -Path venv\Lib\site-packages\skater-1.1.2-py3.8.egg\skater\core\visualizer\tree_visualizer.py
         # Start notebook server
         $> jupyter notebook
         ```
