@@ -449,13 +449,8 @@ def generate_eli5_feature_importance_explanation(models: list, upper_bound: int 
         try:
             weights = explanation.targets[0].feature_weights.pos
         except TypeError as e:
-            try:
-                log.debug("An expected error occurred. Program execution may continue: {}".format(e))
-                weights = explanation.feature_importances.importances
-            except AttributeError as e:
-                log.debug("An expected error occurred. Program execution may continue: {}".format(e))
-                log.warning("{} not supported for ELI5 explanations.".format(model.model_type.algorithm.name))
-                continue
+            log.debug("An expected error occurred. Program execution may continue: {}".format(e))
+            weights = explanation.feature_importances.importances
 
         feature_weight = {}
         for weight in weights:
@@ -608,8 +603,9 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
     start = time.time()
 
     if type == FeatureImportanceType.ELI5:
-        if model.model_type.algorithm is Algorithm.SVC:
-            log.warning("{} not is supported by {}.".format(model.model_type.algorithm.name, type))
+        # TODO: Support XGB when https://github.com/TeamHG-Memex/eli5/pull/407 fixed.
+        if model.model_type.algorithm is Algorithm.SVC or model.model_type.algorithm is Algorithm.XGB:
+            log.warning("{} is not supported by {}.".format(model.model_type.algorithm.name, type.name))
         else:
             plot = plot_feature_importance_with_eli5(model)
     elif type == FeatureImportanceType.SKATER:
@@ -621,7 +617,7 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
             model.init_shap()
         plot_feature_importance_with_shap(model)
     else:
-        log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+        log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type.name))
 
     end = time.time()
     _log_elapsed_time(start, end, "generating a feature importance plot with {} is".format(type.name))
@@ -639,17 +635,25 @@ def generate_feature_importance_explanation(type: FeatureImportanceType, models:
     """
 
     log.info("Generating feature importance explanation for {} ...".format(type.name))
+    text_explanation = ""
+    supported_models = []
 
     if type == FeatureImportanceType.ELI5:
-        str = generate_eli5_feature_importance_explanation(models, upper_bound)
+        for model in models:
+            # TODO: Support XGB when https://github.com/TeamHG-Memex/eli5/pull/407 fixed.
+            if not (model.model_type.algorithm == Algorithm.SVC or model.model_type.algorithm == Algorithm.XGB):
+                supported_models.append(model)
+            else:
+                log.warning("{} is not supported by {}.".format(model.model_type.algorithm.name, type.name))
+        text_explanation = generate_eli5_feature_importance_explanation(supported_models, upper_bound)
     elif type == FeatureImportanceType.SKATER:
-        str = generate_skater_feature_importance_explanation(models, upper_bound)
+        text_explanation = generate_skater_feature_importance_explanation(models, upper_bound)
     elif type == FeatureImportanceType.SHAP:
-        str = generate_shap_feature_importance_explanation(models, upper_bound)
+        text_explanation = generate_shap_feature_importance_explanation(models, upper_bound)
     else:
         log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
 
-    return str
+    return text_explanation
 
 
 def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str):
