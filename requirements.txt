@@ -6,8 +6,6 @@
 #
 argon2-cffi==21.1.0
     # via notebook
-async-generator==1.10
-    # via nbclient
 attrs==21.2.0
     # via
     #   eli5
@@ -24,22 +22,24 @@ certifi==2021.10.8
     # via requests
 cffi==1.15.0
     # via argon2-cffi
-chardet==4.0.0
+charset-normalizer==2.0.7
     # via requests
 click==8.0.3
     # via nltk
 cloudpickle==2.0.0
-    # via shap
+    # via
+    #   dask
+    #   shap
 cycler==0.10.0
     # via matplotlib
 cython==0.29.24
     # via -r requirements.in
-dask==2021.9.1
+dask==2021.10.0
     # via -r requirements.in
+debugpy==1.5.1
+    # via ipykernel
 decorator==5.1.0
-    # via
-    #   ipython
-    #   networkx
+    # via ipython
 defusedxml==0.7.1
     # via nbconvert
 dill==0.3.4
@@ -51,7 +51,11 @@ ds-lime==0.1.1.27
 eli5==0.11.0
     # via -r requirements.in
 entrypoints==0.3
-    # via nbconvert
+    # via
+    #   jupyter-client
+    #   nbconvert
+fsspec==2021.10.1
+    # via dask
 graphviz==0.17
     # via eli5
 httplib2==0.20.1
@@ -71,17 +75,18 @@ ipykernel==6.4.2
     #   jupyter-console
     #   notebook
     #   qtconsole
-ipython-genutils==0.2.0
-    # via
-    #   nbformat
-    #   notebook
-    #   qtconsole
-    #   traitlets
 ipython==7.28.0
     # via
     #   ipykernel
     #   ipywidgets
     #   jupyter-console
+ipython-genutils==0.2.0
+    # via
+    #   ipykernel
+    #   ipywidgets
+    #   nbformat
+    #   notebook
+    #   qtconsole
 ipywidgets==7.6.5
     # via jupyter
 jedi==0.18.0
@@ -99,6 +104,8 @@ joblib==1.1.0
     #   scikit-learn
 jsonschema==4.1.2
     # via nbformat
+jupyter==1.0.0
+    # via -r requirements.in
 jupyter-client==7.0.6
     # via
     #   ipykernel
@@ -115,8 +122,6 @@ jupyter-core==4.8.1
     #   nbformat
     #   notebook
     #   qtconsole
-jupyter==1.0.0
-    # via -r requirements.in
 jupyterlab-pygments==0.1.2
     # via nbconvert
 jupyterlab-widgets==1.0.2
@@ -127,16 +132,21 @@ lime==0.2.0.1
     # via -r requirements.in
 llvmlite==0.37.0
     # via numba
+locket==0.2.1
+    # via partd
 markupsafe==2.0.1
     # via jinja2
-matplotlib==3.2.2
-    # do not upgrade this version -> https://stackoverflow.com/questions/62953704/valueerror-the-number-of-fixedlocator-locations-5-usually-from-a-call-to-set
-    # via 
+matplotlib==3.1.1
+    # via
     #   -r requirements.in
     #   lime
     #   pdpbox
     #   scikit-image
     #   wordcloud
+matplotlib-inline==0.1.3
+    # via
+    #   ipykernel
+    #   ipython
 mistune==0.8.4
     # via nbconvert
 multipledispatch==0.6.0
@@ -156,7 +166,9 @@ nbformat==5.1.3
     #   nbconvert
     #   notebook
 nest-asyncio==1.5.1
-    # via nbclient
+    # via
+    #   jupyter-client
+    #   nbclient
 networkx==2.6.3
     # via scikit-image
 nltk==3.6.5
@@ -168,7 +180,6 @@ notebook==6.4.5
 numba==0.54.1
     # via shap
 numpy==1.20.0
-    # do not upgrade this version -> Numba 0.54.1 needs NumPy 1.20 or less
     # via
     #   ds-lime
     #   eli5
@@ -190,7 +201,10 @@ numpy==1.20.0
     #   wordcloud
     #   xgboost
 packaging==21.0
-    # via bleach
+    # via
+    #   bleach
+    #   dask
+    #   shap
 pandas==1.3.4
     # via
     #   pdpbox
@@ -202,6 +216,8 @@ pandocfilters==1.5.0
     # via nbconvert
 parso==0.8.2
     # via jedi
+partd==1.2.0
+    # via dask
 patsy==0.5.2
     # via statsmodels
 pdpbox==0.2.1
@@ -213,9 +229,10 @@ pickleshare==0.7.5
 pillow==8.4.0
     # via
     #   imageio
-    #   matplotlib
     #   scikit-image
     #   wordcloud
+plumbum==1.7.0
+    # via pandoc
 ply==3.11
     # via pandoc
 prometheus-client==0.11.0
@@ -281,8 +298,8 @@ scikit-learn==1.0
     #   eli5
     #   imbalanced-learn
     #   lime
-    #   pdpbox
     #   shap
+    #   sklearn
 scipy==1.7.1
     # via
     #   ds-lime
@@ -301,14 +318,14 @@ shap==0.40.0
     # via -r requirements.in
 six==1.16.0
     # via
-    #   argon2-cffi
     #   bleach
     #   cycler
     #   eli5
-    #   jsonschema
     #   multipledispatch
     #   patsy
     #   python-dateutil
+sklearn==0.0
+    # via pdpbox
 slicer==0.0.7
     # via shap
 soupsieve==2.2.1
@@ -326,7 +343,10 @@ threadpoolctl==3.0.0
 tifffile==2021.10.12
     # via scikit-image
 toolz==0.11.1
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   dask
+    #   partd
 tornado==6.1
     # via
     #   ipykernel
@@ -345,6 +365,7 @@ traitlets==5.1.0
     #   ipywidgets
     #   jupyter-client
     #   jupyter-core
+    #   matplotlib-inline
     #   nbclient
     #   nbconvert
     #   nbformat
