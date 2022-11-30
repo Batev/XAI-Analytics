@@ -99,11 +99,10 @@ def get_column_transformer(numerical: list, categorical: list) -> ColumnTransfor
 
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median'))])
-        #, ('scaler', StandardScaler())]) commented out because model interpretation is unreadable
 
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+        ('onehot', OneHotEncoder(handle_unknown='ignore', drop='if_binary'))])
 
     return ColumnTransformer(
                 transformers=[
