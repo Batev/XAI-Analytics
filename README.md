@@ -36,19 +36,20 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
         $> jupyter notebook
         ```
 
-    * Windows
+    * Windows (PowerShell)
 
         ```powershell
         # (Optional) Create a new virtual environment 
         $> python -m venv venv
         # Start the virtual environment, e.g. venv
+        $> set-executionpolicy RemoteSigned -Scope CurrentUser
         $> .\venv\Scripts\activate
         # Install project requirements
         $> pip install -r requirements.txt
         # Modules with outdated dependencies (e.g. Skater on wordcloud==1.3.1), that are erroneous when installed with pip.  
         $> pip install --no-dependencies --no-cache-dir -r requirements-no-deps.txt
-        # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
-        $> get-content Lib\site-packages\skater-1.1.2-py3.8.egg\skater\core\visualizer\tree_visualizer.py | %{$_ -replace "from sklearn.externals.six","import StringIO/from six import StringIO"}
+        # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary. If you use python 3.7 or 3.8 the path to skater should be adjusted accordingly, e.g. ...skater-1.1.2-py3.9.egg...
+        $> (Get-Content venv\Lib\site-packages\skater-1.1.2-py3.9.egg\skater\core\visualizer\tree_visualizer.py) | %{$_ -replace "from sklearn.externals.six import StringIO", "from six import StringIO"} | Set-Content venv\Lib\site-packages\skater-1.1.2-py3.9.egg\skater\core\visualizer\tree_visualizer.py
         # Start notebook server
         $> jupyter notebook
         ```
@@ -57,8 +58,10 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
 1. Run *XAI-Analytics.ipynb* notebook file
 
 ## Prerequisites
+ * Python >= 3.7* and <= 3.9*
+ * Microsoft Visual C++ > 14.0 (Windows only)
 
-Please refer to the [requirements file](requirements.txt) for a list of the prerequisites. The file excludes [XAI](https://github.com/EthicalML/xai) and [Skater](https://github.com/oracle/Skater) because of incompatible versions in the dependencies when started with [binder](https://mybinder.org/). The [requirements.txt](requirements.txt) is auto-generated from [requirements.in](requirements.in) (which consists of the raw dependencies) using [pip-compile](https://github.com/jazzband/pip-tools). For using locally with all required modules please refer to the [Run locally](#run-locally) step.
+Please refer to the [requirements file](requirements.txt) for a list of the python module prerequisites. The file excludes [XAI](https://github.com/EthicalML/xai), [Skater](https://github.com/oracle/Skater) and [PDPbox](https://github.com/SauceCat/PDPbox) because of incompatible versions in the dependencies when started with [binder](https://mybinder.org/). The [requirements.txt](requirements.txt) is auto-generated from [requirements.in](requirements.in) (which consists of the raw dependencies) using [pip-compile](https://github.com/jazzband/pip-tools). For using locally with all required modules please refer to the [Run locally](#run-locally) step.
 
 ## <a name="demo"></a>Demo
 
