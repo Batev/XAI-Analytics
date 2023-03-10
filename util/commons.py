@@ -99,7 +99,9 @@ def get_column_transformer(numerical: list, categorical: list) -> ColumnTransfor
     """
 
     numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median'))])
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scale', StandardScaler())
+        ])
 
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
