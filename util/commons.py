@@ -12,7 +12,7 @@ from IPython import display
 from eli5 import show_weights, explain_weights
 from shap import summary_plot, dependence_plot, force_plot
 from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import accuracy_score, classification_report, r2_score,\
     mean_squared_error, plot_confusion_matrix, plot_roc_curve
 from sklearn.linear_model import LogisticRegression, LinearRegression
@@ -26,6 +26,7 @@ from sklearn.exceptions import NotFittedError
 from xgboost import XGBClassifier
 from pandas.api.types import is_numeric_dtype, is_string_dtype
 from multipledispatch import dispatch
+from rbo import RankingSimilarity
 from pdpbox import pdp
 from util.dataset import Datasets, Dataset
 from util.model import Algorithm, Model, ModelType, ProblemType
@@ -118,49 +119,55 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
     :param data_size: The size of the data used for training.
     :return: A new pipeline
     """
+
     if algorithm is Algorithm.LOGISTIC_REGRESSION:
-        return Pipeline([("preprocessor", ct),
-                         ("model",
-                         LogisticRegression(class_weight="balanced",
-                                            solver="liblinear",
-                                            random_state=RANDOM_NUMBER))])
+        estimator = LogisticRegression(
+            max_iter=1000,
+            solver='liblinear',
+            C=1,
+            penalty='l1',
+            dual=False,
+            random_state=RANDOM_NUMBER)
     elif algorithm is Algorithm.DECISION_TREE:
-        return Pipeline([("preprocessor", ct),
-                         ("model",
-                          DecisionTreeClassifier(class_weight="balanced"))])
+        estimator = DecisionTreeClassifier(
+            criterion='gini',
+            splitter='best',
+            max_depth=8,
+            max_features=1.0,
+            random_state=RANDOM_NUMBER)
     elif algorithm is Algorithm.RANDOM_FOREST:
-        n_estimators = int(5 if _get_number_of_digits(data_size) < 4
-                           else math.pow(10, _get_number_of_digits(data_size)-3))
-        log.debug("Number of estimators for {}: {}".format(algorithm.name, n_estimators))
-        return Pipeline([("preprocessor", ct),
-                         ("model",
-                          RandomForestClassifier(class_weight="balanced",
-                                                 n_estimators=n_estimators,
-                                                 n_jobs=-1))])
+        estimator = RandomForestClassifier(
+            criterion='gini',
+            n_estimators=1200,
+            max_depth=22,
+            max_features=0.25,
+            min_samples_split=10,
+            min_samples_leaf=2,
+            bootstrap=True,
+            random_state=RANDOM_NUMBER,
+            n_jobs=-1)
     elif algorithm is Algorithm.XGB:
-        return Pipeline([("preprocessor", ct),
-                         ("model",
-                          XGBClassifier(n_jobs=-1))])
+        estimator = XGBClassifier(
+            random_state=RANDOM_NUMBER,
+            n_jobs=-1)
     elif algorithm is Algorithm.SVC:
-        return Pipeline([("preprocessor", ct),
-                         ("model",
-                          SVC(class_weight="balanced",
-                              # kernel="linear",
-                              # kernel="sigmoid",
-                              kernel="rbf",
-                              # kernel='poly',
-                              # degree=3,
-                              random_state=RANDOM_NUMBER,
-                              probability=True,
-                              verbose=False))])
+        estimator = SVC(
+            kernel="rbf",
+            C=100,
+            gamma=0.01,
+            random_state=RANDOM_NUMBER,
+            probability=True,
+            verbose=False)
     elif algorithm is Algorithm.LINEAR_REGRESSION:
-        return Pipeline([("preprocessor", ct),
-                         ("model",
-                          LinearRegression(n_jobs=-1))])
+        estimator = LinearRegression(n_jobs=-1)
     elif algorithm is Algorithm.SVM:
         raise NotImplementedError
     else:
         raise NotImplementedError
+
+    pipeline = Pipeline([("preprocessor", ct), ("model", estimator)])
+
+    return pipeline
 
 
 def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Series)\
@@ -305,7 +312,7 @@ def _get_random_number() -> int:
         random_number = RANDOM_NUMBER
     else:
         random_number = randrange(100)
-    log.debug("Random number used for the train/test split: {}.".format(random_number))
+        log.debug("Random number value was set to: {}.".format(random_number))
 
     return random_number
 
@@ -320,10 +327,10 @@ def _set_random_number(random_number: int):
     global RANDOM_NUMBER
     if not RANDOM_NUMBER:
         RANDOM_NUMBER = random_number
-        log.debug("Value of RANDOM_NUMBER is set to {0}".format(random_number))
+        log.info("Value of RANDOM_NUMBER is set to {0}".format(random_number))
     else:
-        log.debug("Trying to change the value of a constant variable RANDOM_NUMBER from {0} to {1}."
-                  .format(RANDOM_NUMBER, random_number))
+        log.warning("Trying to change the value of a constant variable RANDOM_NUMBER from {0} to {1}."
+                    .format(RANDOM_NUMBER, random_number))
 
 
 def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
@@ -400,155 +407,178 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
     return model, X_train, y_train, X_test, y_test
 
 
-def plot_feature_importance_with_eli5(model: Model) -> display.HTML:
+def plot_feature_importance_with_eli5(model: Model) -> (display.HTML, dict):
     """
     Global explanation for a model of type feature importance.
     :param model: The model to be interpreted.
-    :return: IPython.display.HTML element with the feature importance.
+    :return: (IPython.display.HTML element with the feature importance, feature importance in a dictionary format)
     """
-    return show_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
+
+    weights = []
+    explanation = explain_weights(model.model.named_steps["model"],
+                                  feature_names=model.features_ohe,
+                                  top=len(model.features_ohe))
+
+    try:
+        weights = explanation.targets[0].feature_weights.pos
+    except TypeError as e:
+        log.debug("An expected error occurred. Program execution may continue: {}".format(e))
+        weights = explanation.feature_importances.importances
+
+    feature_weight = {}
+    for weight in weights:
+        if weight.weight > 0:
+            feature_weight[weight.feature] = weight.weight
+
+    return show_weights(model.model.named_steps["model"], feature_names=model.features_ohe), feature_weight
 
 
-def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Axes):
+def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Axes, dict):
     """
-    Global explanation for a model of type feature importance.
+    Global explanation for a model of type (permutation) feature importance.
     :param model: The model to be interpreted.
-    :return: (f, ax): (figure instance, matplotlib.axes._subplots.AxesSubplot)
+    :return: (f, ax, feature_weight): (figure instance, matplotlib.axes._subplots.AxesSubplot,
+    feature importance in a dictionary format)
     """
 
-    f, ax = model.skater_interpreter.feature_importance.plot_feature_importance(
-        model.skater_model,
-        n_samples=1000,
-        ascending=True)
-    return f, ax
+    from matplotlib import pyplot
+    from itertools import cycle
+
+    ascending = True
+
+    weights = model.skater_interpreter.feature_importance.feature_importance(model.skater_model,
+                                                                             n_samples=1000,
+                                                                             ascending=ascending,
+                                                                             n_jobs=2)
+    feature_weight = {}
+
+    for i in range(1, len(weights) + 1):
+        if weights[i * (-1)] > 0:
+            feature_weight[list(weights.keys())[i * (-1)]] = weights[i * (-1)]
+
+    f, ax = pyplot.subplots(1)
+    colors = cycle(['#328BD5', '#404B5A', '#3EB642', '#E04341', '#8665D0'])
+    color = next(colors)
+    weights.sort_values(ascending=ascending).plot(kind='barh', ax=ax, color=color)
+
+    return f, ax, feature_weight
 
 
-def plot_feature_importance_with_shap(model: Model, plot_type="bar"):
+def plot_feature_importance_with_shap(model: Model, plot_type="bar") -> dict:
     """
     Plot feature importance for a given model with shap.
     :param model: Model for which the feature importance should be plotted.
     :param plot_type: The type of the plot
-    :return: void
-    """
-    summary_plot(model.shap_values, model.X_test_ohe, plot_type=plot_type)
-
-
-def generate_eli5_feature_importance_explanation(models: list, upper_bound: int = 3) -> str:
-    """
-    Generate explanation regarding the weights of some features for each model.
-    :param models: Models, for which an explanation should be generated.
-    :param upper_bound: For how many features an explanation should be generated per model.
-    :return: String message containing an auto-generated explanation.
+    :return: feature importance in a dictionary format
     """
 
-    model_weight = {}
-    for model in models:
-        weights = []
-        explanation = explain_weights(model.model.named_steps["model"], feature_names=model.features_ohe)
-        try:
-            weights = explanation.targets[0].feature_weights.pos
-        except TypeError as e:
-            log.debug("An expected error occurred. Program execution may continue: {}".format(e))
-            weights = explanation.feature_importances.importances
+    if not model.shap_values:
+        model.init_shap()
 
-        feature_weight = {}
-        for weight in weights:
-            feature_weight[weight.feature] = weight.weight
+    feature_mean = {}
+    feature_order = np.argsort(np.sum(-np.mean(np.abs(model.shap_values), axis=1), axis=0))
+    feature_weight = np.sum(np.mean(np.abs(model.shap_values), axis=1), axis=0)
 
-        model_weight[model.name] = feature_weight
-
-    return _generate_generic_feature_importance_explanation(upper_bound, model_weight)
-
-
-def generate_skater_feature_importance_explanation(models: list, upper_bound: int = 3) -> str:
-    """
-    Generate explanation regarding the (permutation) feature importance for each feature of a model.
-    :param models: Models, for which an explanation should be generated.
-    :param upper_bound: For how many features an explanation should be generated per model.
-    :return: String message containing an auto-generated explanation.
-    """
-
-    model_weight = {}
-    for model in models:
-        if not model.skater_model or not model.skater_interpreter:
-            model.init_skater()
-
-        weights = model.skater_interpreter.feature_importance.feature_importance(model.skater_model)
-        feature_weight = {}
-
-        for i in range(1, len(weights) + 1):
-            feature_weight[list(weights.keys())[i*(-1)]] = weights[i*(-1)]
-
-        model_weight[model.name] = feature_weight
-
-    return _generate_generic_feature_importance_explanation(upper_bound, model_weight)
-
-
-def generate_shap_feature_importance_explanation(models: list, upper_bound: int = 3) -> str:
-    """
-    Generate explanation regarding the average impact on model output magnitude for each feature of a model.
-    :param models: Models, for which an explanation should be generated.
-    :param upper_bound: For how many features an explanation should be generated per model.
-    :return: String message containing an auto-generated explanation.
-    """
-    model_weight = {}
-
-    for model in models:
-        if not model.shap_values:
-            model.init_shap()
-
-        feature_mean = {}
-        feature_order = np.argsort(np.sum(-np.mean(np.abs(model.shap_values), axis=1), axis=0))
-        feature_weight = np.sum(np.mean(np.abs(model.shap_values), axis=1), axis=0)
-
-        for feature_key in feature_order:
+    for feature_key in feature_order:
+        if feature_weight[feature_key] > 0:
             feature_mean[model.features_ohe[feature_key]] = feature_weight[feature_key].round(3)
-        model_weight[model.name] = feature_mean
 
-    return _generate_generic_feature_importance_explanation(upper_bound, model_weight)
+    summary_plot(model.shap_values, model.X_test_ohe, plot_type=plot_type)
+    return feature_mean
 
 
-def _generate_generic_feature_importance_explanation(upper_bound: int, model_weight: dict) -> str:
+def calculate_rbos(
+        type: FeatureImportanceType,
+        models: list,
+        d_min: int = 5,
+        d_max: int = None,
+        step: int = 1)\
+        -> pd.DataFrame:
     """
-    Generates the explanation messages given a the weights and feature names for each model.
-    :param upper_bound: For how many features should a message be generated
-    :param model_weight: A dict consisting of [model name] -> [dict] (consisting of [feature] -> [weight])
-    :return:
+    Calculates the rank-biased overlap (RBO) between all model combinations from the list for a given feature importance
+    technique. The persistence (p-value) for the RBO algorithm is calculated (d-1)/d, where d is the depth. The RBO
+    for each combination is calculated multiple time based on the minimal depth (d_min) value, maximal depth (d_max) and
+    the step value.
+    :param type: The type of feature importance for which the RBOs should be calculated.
+    :param models: The list of models for whose FIs the RBOs should be calculated
+    :param d_min: The minimal depth for which the RBOs should be calculated. The maximal depth is length of the shortest
+    feature importance list of this type or the explicitly set input parameter.
+    :param d_max: The maximal depth for which the RBOs should be calculated. If none, the shortest feature importance
+    list length will be used as maximal depth.
+    :param step: The step with which the depth should be increased on each iteration until the maximal depth is reached.
+    :return: A pandas.DataFrame consisting of multiple columns. The first column is with the persistence (p) values,
+     the second column is with the depth (d) values, then a column for each combination of the models and the last
+     column is the mean RBO value from all combinations for this row.
     """
+    from itertools import combinations
 
-    expln = ["Summary:\n"]
-    phrases = ["same as", "identical to", "alike", "matching", "similar to"]
-    adjectives = ["highest", "best", "most important", "most valuable", "most influential"]
-    visited = []
-
-    for model_name, weights in model_weight.items():
-        if len(weights) < upper_bound:
-            upper_bound = len(weights)
-        for count in range(0, upper_bound):
-            feature = list(weights.keys())[count]
-            weight = weights[feature]
-
-            msg = "The {}{} feature for {} is {} with weight ~{}"\
-                .format(_get_nth_ordinal(count + 1) + " " if count + 1 != 1 else "",
-                        choice(adjectives),
-                        model_name,
-                        feature,
-                        round(weight, 3))
-
-            if feature in visited:
-                other_model_name = list(model_weight.keys())[visited.index(feature) // upper_bound]
-                msg = msg + ", {0} {1} for {2}.\n"\
-                    .format(choice(phrases),
-                            _get_nth_ordinal(list(model_weight[other_model_name].keys()).index(feature) + 1),
-                            other_model_name)
+    if not d_max:
+        lengths = []
+        for model in models:
+            if type == FeatureImportanceType.ELI5 and model.feature_weight_eli5:
+                lengths.append(len(model.feature_weight_eli5))
+            elif type == FeatureImportanceType.SKATER and model.feature_weight_skater:
+                lengths.append(len(model.feature_weight_skater))
+            elif type == FeatureImportanceType.SHAP and model.feature_weight_skater:
+                lengths.append(len(model.feature_weight_shap))
             else:
-                msg = msg + ".\n"
-            expln.append(msg)
-            visited.append(feature)
+                log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
 
-        expln.append("\n")
+        d_max = min(lengths)
 
-    return ' '.join(expln)
+    p_d = {round((d-1)/d, 3): d for d in range(d_min, d_max+1, step)}
+    df = pd.DataFrame({
+        'p': list(p_d.keys()),
+        'd': list(p_d.values())
+    })
+    for model_1, model_2 in combinations(models, 2):
+        rbos = []
+        for p, d in p_d.items():
+            rbo = 0.0
+            if type == FeatureImportanceType.ELI5:
+                rbo = _calculate_rbo(model_1.feature_weight_eli5, model_2.feature_weight_eli5, d, p, True)
+            elif type == FeatureImportanceType.SKATER:
+                rbo = _calculate_rbo(model_1.feature_weight_skater, model_2.feature_weight_skater, d, p, True)
+            elif type == FeatureImportanceType.SHAP:
+                rbo = _calculate_rbo(model_1.feature_weight_shap, model_2.feature_weight_shap, d, p, True)
+            else:
+                log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+
+            if rbo:
+                rbos.append(rbo)
+            else:
+                log.debug("Feature importance for {}, {} or both is empty for feature importance type: {}."
+                          " Please calculate the feature importance for these models."
+                          .format(model_1.name, model_2.name, type.name))
+        if rbos:
+            df['{}_{}'.format(model_1.name, model_2.name)] = rbos
+    df['Mean'] = round(df.iloc[:, 2:].mean(axis=1), 3)
+
+    return df
+
+
+def _calculate_rbo(feature_weight_1: dict, feature_weight_2: dict, d: int, p: int, ext: bool = True) -> float:
+    """
+    Calculates a single rank-biased overlap (RBO) value for two models' feature importances.
+    :param feature_weight_1: Dictionary containing the FIs for the first model of type {feature name: feature weight}.
+    :param feature_weight_2: Dictionary containing the FIs for the second model of type {feature name: feature weight}.
+    :param d: The depth of the RBO.
+    :param p: The persistence of the RBO.
+    :param ext: Whether extrapolation shall be used or not  for the RBO.
+    :return: (float) The rank-biased overlap value for these feature importances.
+    If one of the dicts is empty 0.0 is returned.
+    """
+    if feature_weight_1 is not None and feature_weight_2 is not None:
+        rbo = \
+            round(
+                RankingSimilarity(
+                    list(feature_weight_1.keys()),
+                    list(feature_weight_2.keys()))
+                .rbo(k=d, p=p, ext=ext)
+                , 3)
+    else:
+        rbo = 0.0
+    return rbo
 
 
 def _get_nth_ordinal(n: int) -> str:
@@ -606,15 +636,18 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
         if model.model_type.algorithm is Algorithm.SVC or model.model_type.algorithm is Algorithm.XGB:
             log.warning("{} is not supported by {}.".format(model.model_type.algorithm.name, type.name))
         else:
-            plot = plot_feature_importance_with_eli5(model)
+            plot, feature_weight_eli5 = plot_feature_importance_with_eli5(model)
+            model.feature_weight_eli5 = feature_weight_eli5
     elif type == FeatureImportanceType.SKATER:
         if not model.skater_model or not model.skater_interpreter:
             model.init_skater()
-        plot_feature_importance_with_skater(model)
+        plot, _, feature_weight_skater = plot_feature_importance_with_skater(model)
+        model.feature_weight_skater = feature_weight_skater
     elif type == FeatureImportanceType.SHAP:
         if not model.shap_values:
             model.init_shap()
-        plot_feature_importance_with_shap(model)
+        feature_weight_shap = plot_feature_importance_with_shap(model)
+        model.feature_weight_shap = feature_weight_shap
     else:
         log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type.name))
 

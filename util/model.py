@@ -82,6 +82,9 @@ class Model:
         self._skater_interpreter = None
         self._skater_model = None
         self._lime_explainer = None
+        self._feature_weight_eli5 = None
+        self._feature_weight_skater = None
+        self._feature_weight_shap = None
         self._X_train_ohe = None
         self._X_test_ohe = None
         self._numerical_features = None
@@ -314,6 +317,30 @@ class Model:
     @lime_explainer.setter
     def lime_explainer(self, new_value):
         self._lime_explainer = new_value
+
+    @property
+    def feature_weight_eli5(self):
+        return self._feature_weight_eli5
+
+    @feature_weight_eli5.setter
+    def feature_weight_eli5(self, new_value):
+        self._feature_weight_eli5 = new_value
+
+    @property
+    def feature_weight_skater(self):
+        return self._feature_weight_skater
+
+    @feature_weight_skater.setter
+    def feature_weight_skater(self, new_value):
+        self._feature_weight_skater = new_value
+
+    @property
+    def feature_weight_shap(self):
+        return self._feature_weight_shap
+
+    @feature_weight_shap.setter
+    def feature_weight_shap(self, new_value):
+        self._feature_weight_shap = new_value
 
     @property
     def X_train_ohe(self):
