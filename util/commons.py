@@ -232,7 +232,9 @@ def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list,
     else:
         X_train, X_test, y_train, y_test, random_number = _get_train_test_split(split, cat_features, df_x, df_y)
 
-    _set_random_number(random_number=random_number)
+    if random_number != RANDOM_NUMBER:
+        _set_random_number(random_number=random_number)
+
     return X_train, X_test, y_train, y_test
 
 
@@ -536,7 +538,7 @@ def calculate_rbos(
     for model_1, model_2 in combinations(models, 2):
         rbos = []
         for p, d in p_d.items():
-            rbo = 0.0
+            rbo = None
             if type == FeatureImportanceType.ELI5:
                 rbo = _calculate_rbo(model_1.feature_weight_eli5, model_2.feature_weight_eli5, d, p, True)
             elif type == FeatureImportanceType.SKATER:
@@ -546,7 +548,7 @@ def calculate_rbos(
             else:
                 log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
 
-            if rbo:
+            if rbo is not None:
                 rbos.append(rbo)
             else:
                 log.debug("Feature importance for {}, {} or both is empty for feature importance type: {}."
@@ -555,6 +557,7 @@ def calculate_rbos(
         if rbos:
             df['{}_{}'.format(model_1.name, model_2.name)] = rbos
     df['Mean'] = round(df.iloc[:, 2:].mean(axis=1), 3)
+    df.style.highlight_max()
 
     return df
 
@@ -568,7 +571,7 @@ def _calculate_rbo(feature_weight_1: dict, feature_weight_2: dict, d: int, p: in
     :param p: The persistence of the RBO.
     :param ext: Whether extrapolation shall be used or not  for the RBO.
     :return: (float) The rank-biased overlap value for these feature importances.
-    If one of the dicts is empty 0.0 is returned.
+    If one of the dicts is empty None is returned.
     """
     if feature_weight_1 is not None and feature_weight_2 is not None:
         rbo = \
@@ -579,7 +582,7 @@ def _calculate_rbo(feature_weight_1: dict, feature_weight_2: dict, d: int, p: in
                 .rbo(k=d, p=p, ext=ext)
                 , 3)
     else:
-        rbo = 0.0
+        rbo = None
     return rbo
 
 
@@ -657,37 +660,6 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
     _log_elapsed_time(start, end, "generating a feature importance plot with {} is".format(type.name))
 
     return plot
-
-
-def generate_feature_importance_explanation(type: FeatureImportanceType, models: list, upper_bound: int = 3) -> str:
-    """
-    Auto-generate explanation for the feature importance results of each model in the list.
-    :param type: Type of feature importance that should be explained
-    :param models: List of all models for which an explanation should be generated
-    :param upper_bound: For how many features of each model a generation should be generated
-    :return: A string containing the explanation.
-    """
-
-    log.info("Generating feature importance explanation for {} ...".format(type.name))
-    text_explanation = ""
-    supported_models = []
-
-    if type == FeatureImportanceType.ELI5:
-        for model in models:
-            # TODO: Support XGB when https://github.com/TeamHG-Memex/eli5/pull/407 fixed.
-            if not (model.model_type.algorithm == Algorithm.SVC or model.model_type.algorithm == Algorithm.XGB):
-                supported_models.append(model)
-            else:
-                log.warning("{} is not supported by {}.".format(model.model_type.algorithm.name, type.name))
-        text_explanation = generate_eli5_feature_importance_explanation(supported_models, upper_bound)
-    elif type == FeatureImportanceType.SKATER:
-        text_explanation = generate_skater_feature_importance_explanation(models, upper_bound)
-    elif type == FeatureImportanceType.SHAP:
-        text_explanation = generate_shap_feature_importance_explanation(models, upper_bound)
-    else:
-        log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
-
-    return text_explanation
 
 
 def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str):
