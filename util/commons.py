@@ -61,6 +61,7 @@ class PDPType(enum.Enum):
 
 class LocalInterpreterType(enum.Enum):
     LIME = 1
+    OPTIMIZED_LIME = 2
     SHAP = 2
 
 
@@ -894,13 +895,19 @@ def get_example_information(model: Model, example: int):
     return msg
 
 
-def explain_single_instance(local_interpreter: LocalInterpreterType, model: Model, example: int):
+def explain_single_instance(
+        local_interpreter: LocalInterpreterType,
+        model: Model,
+        example: int,
+        kernel_width: float = None):
     """
     Explain single instance (example) with a given interpreter type.
     :param local_interpreter: Type of interpreter to be used. Currently only LIME and SHAP are supported
     :param model: The model for which an instance should be explained
     :param example: The example to be explained - The row number from the X_test pd.DataFrame
-    :return: An explanation
+    :param kernel_width: (Optional) Set the kernel_width for LIME explanations. None results in the default kernel_width
+    which is 'sqrt(number of columns) * 0.75'.
+    :return: Either a LIME or a SHAP explanation
     """
     explanation = None
     log.info("Generating a single instance explanation using {} for {} ...".format(local_interpreter.name, model.name))
@@ -908,9 +915,34 @@ def explain_single_instance(local_interpreter: LocalInterpreterType, model: Mode
     start = time.time()
 
     if local_interpreter is LocalInterpreterType.LIME:
-        if not model.lime_explainer:
-            model.init_lime()
+        model.init_lime(kernel_width=kernel_width)
         explanation = explain_single_instance_with_lime(model, example)
+    elif local_interpreter is LocalInterpreterType.OPTIMIZED_LIME:
+        log.info("Initializing LIME - generating new explainer and optimizing the kernel width."
+                 " This operation may be time-consuming so please be patient.")
+
+        def explain_single_instance_with_lime_stability_wrapper(model: Model, example: int, kernel_width: float):
+            model.init_lime_stability(kernel_width=kernel_width)
+            _, csi, vsi = explain_single_instance_with_lime_stability(model, example)
+            return csi, vsi
+
+        from math import sqrt
+        search_space = np.sort(np.append(
+            sqrt(len(model.X_train.columns)) * 0.75,
+            np.linspace(0.15, 8.15, num=50, dtype=float)))
+        f = partial(explain_single_instance_with_lime_stability_wrapper, model, example)
+        best_kernel_width, (csi, vsi) = optimize_function(f,
+                                                          search_space,
+                                                          num_samples=30,
+                                                          num_iterations=30,
+                                                          learning_rate=0.1)
+        log.info("The optimal kernel width for example {} and {} is {}.\n"
+                 "Variables Stability Index (VSI): {}\n"
+                 "Coefficients Stability Index (CSI): {}"
+                 .format(example, model.name, best_kernel_width, csi, vsi))
+
+        model.init_lime_stability(kernel_width=best_kernel_width)
+        explanation, _, _ = explain_single_instance_with_lime_stability(model, example)
     elif local_interpreter is LocalInterpreterType.SHAP:
         if not model.shap_values:
             model.init_shap()
@@ -923,6 +955,58 @@ def explain_single_instance(local_interpreter: LocalInterpreterType, model: Mode
     _log_elapsed_time(start, end, "generating a single instance explanation with {} is".format(local_interpreter.name))
 
     return explanation
+
+
+def optimize_function(
+        f: callable,
+        search_space: np.ndarray,
+        num_samples: int = 10,
+        num_iterations: int = 100,
+        learning_rate: float = 0.01)\
+        -> (float, (float, float)):
+    """
+    Optimize a function with one input argument within a given search space using random search and locally refining the
+    input by a learning rate.
+    :param f: The function to optimize. This function should take one input argument and return two output values:
+    float -> (float, float).
+    :param search_space: The search space for the input argument. This should be a one-dimensional numpy array of
+    possible input values.
+    :param num_samples: The number of random samples to draw from the search space to initialize the optimization.
+    :param learning_rate: The learning rate for the local optimizer.
+    :param num_iterations: The number of iterations for which the local optimizer should be applied.
+    :return: (best_input, (best_output_1, best_output_2)) A tuple containing the best input value found and a tuple of
+    the corresponding output values.
+    """
+    best_input = None
+    best_output = (-np.inf, -np.inf)
+
+    samples = np.random.choice(search_space, size=num_samples, replace=False)
+    for sample in samples:
+        output1, output2 = f(sample)
+        if (output1 + output2 > best_output[0] + best_output[1]) or\
+                ((output1 + output2 == best_output[0] + best_output[1]) and sample < best_input):
+            best_input = sample
+            best_output = (output1, output2)
+
+    best_random_input = best_input
+    # Refine the best_input by adding/subtracting the learning_rate to/from the best_input num_iterations/2 times.
+    for i in range(2):
+        if i == 0:
+            sign = (+1)
+        else:
+            sign = (-1)
+        for j in range(round(num_iterations/2)):
+            current_learning_rate = j*learning_rate*sign
+            updated_input = best_random_input + current_learning_rate
+
+            if updated_input >= search_space[0]:
+                output1, output2 = f(updated_input)
+                if (output1 + output2 > best_output[0] + best_output[1]) or\
+                        ((output1 + output2 == best_output[0] + best_output[1]) and updated_input < best_input):
+                    best_input = updated_input
+                    best_output = (output1, output2)
+
+    return best_input, best_output
 
 
 def generate_single_instance_comparison(models: list, example: int) -> str:
@@ -1200,12 +1284,13 @@ def convert_to_lime_format(X, categorical_names, col_names=None, invert=False):
     return X_lime
 
 
-def explain_single_instance_with_lime(model: Model, example: int):
+def _explain_single_instance_with_lime(model: Model, example: int) -> (callable, Model, int):
     """
-    Explain single instance with LIME from the test dataset.
-    :param model: Model, which should be explained
-    :param example: Position of the example from the test dataset, that has to be explained
-    :return:
+    This function explains the classification result of a single instance using LIME. It returns an explanation object,
+     a custom predict_proba function that could be used in lime, and the observation that was explained.
+    :param model: The classification model.
+    :param example: Index of the example to be explained.
+    :return: Tuple of explanation object, custom predict_proba function, and observation that was explained.
     """
 
     all_cols = model.X_test.columns
@@ -1226,9 +1311,41 @@ def explain_single_instance_with_lime(model: Model, example: int):
     explanation = model.lime_explainer.explain_instance(
         observation,
         custom_model_predict_proba,
+        num_samples=15000,
         num_features=len(model.numerical_features))
 
+    return explanation, custom_model_predict_proba, observation
+
+
+def explain_single_instance_with_lime(model: Model, example: int):
+    """
+    Explain single instance with LIME from the test dataset.
+    :param model: Model, which should be explained
+    :param example: Position of the example from the test dataset, that has to be explained
+    :return: An explanation object
+    """
+    explanation, _, _ = _explain_single_instance_with_lime(model, example)
+
     return explanation
+
+
+def explain_single_instance_with_lime_stability(model: Model, example: int):
+    """
+    Explain single instance with LIME from the test dataset and calculate the Variables Stability Index (VSI) and
+    Coefficients Stability Index (CSI) for this explanation.
+    :param model: Model, which should be explained
+    :param example: Position of the example from the test dataset, that has to be explained
+    :return: An explanation object, Variables Stability Index (VSI) and Coefficients Stability Index (CSI) for this
+    explanation
+    """
+    explanation, custom_model_predict_proba, observation = _explain_single_instance_with_lime(model, example)
+
+    csi, vsi = model.lime_explainer.check_stability(
+        observation,
+        custom_model_predict_proba,
+        num_features=len(model.numerical_features))
+
+    return explanation, csi, vsi
 
 
 def explain_single_instance_with_shap(model: Model, example: int):

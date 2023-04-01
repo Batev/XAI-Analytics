@@ -279,10 +279,12 @@ class Model:
         else:
             log.info("Skater is already initialized.")
 
-    def init_lime(self):
+    def init_lime(self, kernel_width: float = None):
         """
         Initializes a LIME explainer that can later be used for local interpretations
         for this model.
+        :param kernel_width: kernel width for the exponential kernel. If None, defaults to
+        'sqrt(number of columns) * 0.75'
         :return: void (Sets the value for lime_explainer)
         """
         from lime.lime_tabular import LimeTabularExplainer
@@ -300,6 +302,7 @@ class Model:
             explainer = LimeTabularExplainer(
                 convert_to_lime_format(self.X_test, categorical_names).values,
                 mode="classification",
+                kernel_width=kernel_width,
                 feature_names=self.X_test.columns.tolist(),
                 categorical_names=categorical_names,
                 categorical_features=categorical_names.keys(),
@@ -309,6 +312,38 @@ class Model:
             self.lime_explainer = explainer
         else:
             log.info("LIME is already initialized.")
+
+    def init_lime_stability(self, kernel_width: float = None):
+        """
+        Initializes a LIME explainer using the lime_stability module so that we can also get the stability indices for
+         this explainer.
+        for this model.
+        :param kernel_width: kernel width for the exponential kernel. If None, defaults to
+        'sqrt(number of columns) * 0.75'
+        :return: void (Sets the value for lime_explainer)
+        """
+        from lime_stability.stability import LimeTabularExplainerOvr
+        from util.commons import RANDOM_NUMBER, convert_to_lime_format
+
+        log.debug("Initializing LIME - generating new explainer."
+                  " This operation may be time-consuming so please be patient.")
+
+        # Transform the categorical feature's labels to a lime-readable format.
+        categorical_names = self.idx2ohe
+        log.debug("Categorical names for lime: {}".format(categorical_names))
+
+        explainer = LimeTabularExplainerOvr(
+            convert_to_lime_format(self.X_test, categorical_names).values,
+            mode="classification",
+            kernel_width=kernel_width,
+            feature_names=self.X_test.columns.tolist(),
+            categorical_names=categorical_names,
+            categorical_features=categorical_names.keys(),
+            discretize_continuous=True,
+            random_state=RANDOM_NUMBER
+        )
+
+        self.lime_explainer = explainer
 
     @property
     def lime_explainer(self):
