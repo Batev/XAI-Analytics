@@ -1261,7 +1261,7 @@ def generate_single_instance_explanation_with_lime(model: Model, example: int) -
     :param example: Example, that should be explained
     :return: An explanation.
     """
-    prediction_probability = _get_prediction_for_example(model, example, approximate=False)
+    _, prediction_probability = _get_prediction_for_example(model, example)
     feature_value_weight_lime_local = model.feature_value_weight_lime_local[example]
 
     return _generate_generic_single_instance_explanation(
@@ -1286,7 +1286,7 @@ def generate_single_instance_explanation_with_shap(model: Model, example: int) -
     # shap_values = model.shap_values[prediction][example, :]
     # prediction_probability = np.sum(shap_values) + base_value
 
-    prediction_probability = _get_prediction_for_example(model, example, approximate=False)
+    _, prediction_probability = _get_prediction_for_example(model, example)
     return _generate_generic_single_instance_explanation(
         model.name,
         dict(filter(lambda x: x[1] >= 0.0, feature_value_weight_shap_local.items())),
@@ -1378,17 +1378,16 @@ def _sort_dict_by_value(d: dict, reverse: bool) -> dict:
     return {k: v for k, v in sorted(d.items(), key=lambda item: item[1], reverse=reverse)}
 
 
-def _get_prediction_for_example(model: Model, example: int, approximate: bool) -> int:
+def _get_prediction_for_example(model: Model, example: int) -> (int, float):
     """
     Returns the prediction probability for this example depending on how it was classified by the model.
     :param model: Model for which the example shall be classified
     :param example: Example to be classified
-    :param approximate: When True the result will be rounded to either 0 or 1 depending on the classification
-    :return: The prediction probability for this example as a floating point number between [0.0; 1.0] or [0, 1] if
-    approximation is applied
+    :return: A tuple (int, float) containing (the prediction of the model [0, 1],
+    the prediction probability for this example as a floating point number between [0.0; 1.0])
     """
     predictions = list(model.model.predict_proba(model.X_test)[example])
-    return round(max(predictions)) if approximate else max(predictions)
+    return predictions.index(max(predictions)), max(predictions)
 
 
 def convert_to_lime_format(X, categorical_names, col_names=None, invert=False):
@@ -1500,7 +1499,7 @@ def explain_single_instance_with_shap(model: Model, example: int):
     :param example: Example number to be explained
     :return: A plot for the explanation.
     """
-    prediction = _get_prediction_for_example(model, example, approximate=True)
+    prediction, _ = _get_prediction_for_example(model, example)
 
     fp = force_plot(
         model.shap_kernel_explainer.expected_value[prediction],
