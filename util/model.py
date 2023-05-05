@@ -77,14 +77,22 @@ class Model:
         self._X_test = None
         self._y_test = None
         self._predictions = None
-        self.shap_kernel_explainer = None
+        self._shap_kernel_explainer = None
         self._shap_values = None
         self._skater_interpreter = None
         self._skater_model = None
-        self._lime_explainer = None
+        # {example: lime_explainer}
+        self.example_lime_explainer = {}
+        # {"feature": weight}
         self._feature_weight_eli5 = None
+        # {"feature": weight}
         self._feature_weight_skater = None
+        # {"feature": weight}
         self._feature_weight_shap = None
+        # {example: {"feature = value": weight}}
+        self._feature_value_weight_lime_local = None
+        # {example: {"feature = value": weight}}
+        self._feature_value_weight_shap_local = None
         self._X_train_ohe = None
         self._X_test_ohe = None
         self._numerical_features = None
@@ -213,7 +221,7 @@ class Model:
 
     def init_shap(self):
         """
-        Initialize shap. Calculate shap values. This operation is time consuming.
+        Initialize shap. Calculate shap values. This operation is time-consuming.
         :return: void (Sets the value of the shap_values variable)
         """
         import shap
@@ -227,7 +235,8 @@ class Model:
             logger.setLevel(log.WARN)
 
             shap_kernel_explainer = shap.KernelExplainer(self.model[1].predict_proba,
-                                                         shap.kmeans(self.X_test_ohe, 1))
+                                                         shap.kmeans(self.X_test_ohe, 1),
+                                                         n_jobs=-1)
             shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe)
             # from util.commons import RANDOM_NUMBER
             # shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe.sample(66, random_state=RANDOM_NUMBER))
@@ -279,54 +288,45 @@ class Model:
         else:
             log.info("Skater is already initialized.")
 
-    def init_lime(self, kernel_width: float = None):
+    def init_lime(self, example: int, kernel_width: float = None):
         """
         Initializes a LIME explainer that can later be used for local interpretations
         for this model.
+        :param example: example, for which we are initializing the explainer
         :param kernel_width: kernel width for the exponential kernel. If None, defaults to
         'sqrt(number of columns) * 0.75'
-        :return: void (Sets the value for lime_explainer)
+        :return: void (Sets the value of example_lime_explainer for this example)
         """
         from lime.lime_tabular import LimeTabularExplainer
         from util.commons import RANDOM_NUMBER, convert_to_lime_format
 
-        if not self.lime_explainer:
+        # Transform the categorical feature's labels to a lime-readable format.
+        categorical_names = self.idx2ohe
+        log.debug("Categorical names for lime: {}".format(categorical_names))
 
-            log.info("Initializing LIME - generating new explainer."
-                     " This operation may be time-consuming so please be patient.")
+        explainer = LimeTabularExplainer(
+            convert_to_lime_format(self.X_test, categorical_names).values,
+            mode="classification",
+            kernel_width=kernel_width,
+            feature_names=self.X_test.columns.tolist(),
+            categorical_names=categorical_names,
+            categorical_features=categorical_names.keys(),
+            discretize_continuous=True,
+            random_state=RANDOM_NUMBER)
 
-            # Transform the categorical feature's labels to a lime-readable format.
-            categorical_names = self.idx2ohe
-            log.debug("Categorical names for lime: {}".format(categorical_names))
+        self.example_lime_explainer[example] = explainer
 
-            explainer = LimeTabularExplainer(
-                convert_to_lime_format(self.X_test, categorical_names).values,
-                mode="classification",
-                kernel_width=kernel_width,
-                feature_names=self.X_test.columns.tolist(),
-                categorical_names=categorical_names,
-                categorical_features=categorical_names.keys(),
-                discretize_continuous=True,
-                random_state=RANDOM_NUMBER)
-
-            self.lime_explainer = explainer
-        else:
-            log.info("LIME is already initialized.")
-
-    def init_lime_stability(self, kernel_width: float = None):
+    def init_lime_stability(self, example: int, kernel_width: float = None):
         """
         Initializes a LIME explainer using the lime_stability module so that we can also get the stability indices for
-         this explainer.
-        for this model.
+         this explainer for this model.
+        :param example: example, for which we are initializing the explainer
         :param kernel_width: kernel width for the exponential kernel. If None, defaults to
         'sqrt(number of columns) * 0.75'
-        :return: void (Sets the value for lime_explainer)
+        :return: void (Sets the value of example_lime_explainer for this example)
         """
         from lime_stability.stability import LimeTabularExplainerOvr
         from util.commons import RANDOM_NUMBER, convert_to_lime_format
-
-        log.debug("Initializing LIME - generating new explainer."
-                  " This operation may be time-consuming so please be patient.")
 
         # Transform the categorical feature's labels to a lime-readable format.
         categorical_names = self.idx2ohe
@@ -343,15 +343,15 @@ class Model:
             random_state=RANDOM_NUMBER
         )
 
-        self.lime_explainer = explainer
+        self.example_lime_explainer[example] = explainer
 
     @property
-    def lime_explainer(self):
-        return self._lime_explainer
+    def example_lime_explainer(self):
+        return self._example_lime_explainer
 
-    @lime_explainer.setter
-    def lime_explainer(self, new_value):
-        self._lime_explainer = new_value
+    @example_lime_explainer.setter
+    def example_lime_explainer(self, new_value):
+        self._example_lime_explainer = new_value
 
     @property
     def feature_weight_eli5(self):
@@ -368,6 +368,22 @@ class Model:
     @feature_weight_skater.setter
     def feature_weight_skater(self, new_value):
         self._feature_weight_skater = new_value
+
+    @property
+    def feature_value_weight_lime_local(self):
+        return self._feature_value_weight_lime_local
+
+    @feature_value_weight_lime_local.setter
+    def feature_value_weight_lime_local(self, new_value):
+        self._feature_value_weight_lime_local = new_value
+
+    @property
+    def feature_value_weight_shap_local(self):
+        return self._feature_value_weight_shap_local
+
+    @feature_value_weight_shap_local.setter
+    def feature_value_weight_shap_local(self, new_value):
+        self._feature_value_weight_shap_local = new_value
 
     @property
     def feature_weight_shap(self):

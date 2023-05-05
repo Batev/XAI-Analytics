@@ -6,11 +6,13 @@ import time
 import math
 
 from functools import partial
-from random import choice, choices, randrange
-from matplotlib import figure, axes, pyplot as plt
+from random import choices, randrange
+from matplotlib import figure, axes, font_manager, pyplot as plt
 from IPython import display
 from eli5 import show_weights, explain_weights
 from shap import summary_plot, dependence_plot, force_plot
+from shap.plots._force import AdditiveForceVisualizer
+from lime.explanation import Explanation
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import accuracy_score, classification_report, r2_score,\
@@ -62,7 +64,7 @@ class PDPType(enum.Enum):
 class LocalInterpreterType(enum.Enum):
     LIME = 1
     OPTIMIZED_LIME = 2
-    SHAP = 2
+    SHAP = 3
 
 
 class ExampleType(enum.Enum):
@@ -663,60 +665,68 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
     return plot
 
 
-def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str):
+def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str) -> figure:
     """
     Generate a PDP including one or two features for a given model.
     :param type: Type of framework that should be used for generating the PDPs
     :param model: Model for which a plot shall be generated
     :param feature1: Feature to be included in the PDP.
     :param feature2: If none, plot a PDP for only feature1
-    :return: None; TODO: return a plot.
+    :return: A matplotlib.pyplot.figure of the PDP.
     """
-    plot = None
+    fig = None
     log.info("Generating a PDP plot using {} for {} ...".format(type.name, model.name))
 
     start = time.time()
 
     if type == PDPType.PDPBox:
         if feature2 == 'None':
-            plot_single_pdp_with_pdpbox(model, feature1)
+            fig, ax = plot_single_pdp_with_pdpbox(model, feature1)
         else:
-            plot_multi_pdp_with_pdpbox(model, feature1, feature2)
+            fig, ax = plot_multi_pdp_with_pdpbox(model, feature1, feature2)
+
     elif type == PDPType.SKATER:
         if not model.skater_model or not model.skater_interpreter:
             model.init_skater()
         if feature2 == 'None':
-            plot_single_pdp_with_skater(model, feature1)
+            fig, ax = plot_single_pdp_with_skater(model, feature1)
         else:
-            plot_multi_pdp_with_skater(model, feature1, feature2)
+            fig, ax = plot_multi_pdp_with_skater(model, feature1, feature2)
+
     elif type == PDPType.SHAP:
         if not model.shap_values:
             model.init_shap()
         if feature2 == 'None':
-            plot_single_pdp_with_shap(model, feature1)
+            fig, ax = plot_single_pdp_with_shap(model, feature1)
         else:
-            plot_multi_pdp_with_shap(model, feature1, feature2)
+            fig, ax = plot_multi_pdp_with_shap(model, feature1, feature2)
+
     else:
         log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
 
     end = time.time()
     _log_elapsed_time(start, end, "generating a PDP with {} is".format(type.name))
 
-    return plot
+    return fig
 
 
-def plot_single_pdp_with_pdpbox(model: Model, feature: str, plot_lines=True,
-                                x_quantile=True, show_percentile=True, plot_pts_dist=True,)\
+def plot_single_pdp_with_pdpbox(
+        model: Model,
+        feature: str,
+        plot_lines=True,
+        x_quantile=True,
+        show_percentile=True,
+        plot_pts_dist=True,)\
         -> (figure.Figure, axes.Axes):
     """
     Plots a PDP for a single feature for a given model.
     :param model: The model for which a PDP should be created
     :param feature: Feature or feature list to investigate, for one-hot encoding features, feature list is required
     :param plot_lines: Whether to plot out the individual lines
-    :param x_quantile: Whether to construct x axis ticks using quantiles
+    :param x_quantile: Whether to construct x-axis ticks using quantiles
     :param show_percentile: Whether to display the percentile buckets, for numeric feature when grid_type='percentile'
     :param plot_pts_dist: Whether to show data points distribution
-    :return: (f, ax): (figure instance, matplotlib.axes._subplots.AxesSubplot)
+    :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
 
     # model.model[1] to get the actual model from the pipeline
@@ -726,7 +736,7 @@ def plot_single_pdp_with_pdpbox(model: Model, feature: str, plot_lines=True,
         model_features=model.features_ohe,
         feature=feature)
 
-    fig, axes = pdp.pdp_plot(
+    fig, ax = pdp.pdp_plot(
         pdp_isolate_out=pdp_isolate_out,
         feature_name=feature if isinstance(feature, str) else feature[0].split('_')[0].title,
         plot_lines=plot_lines,
@@ -735,20 +745,81 @@ def plot_single_pdp_with_pdpbox(model: Model, feature: str, plot_lines=True,
         plot_pts_dist=plot_pts_dist,
         frac_to_plot=0.5)
 
-    return fig, axes
+    return fig, ax
 
 
-def plot_multi_pdp_with_pdpbox(model: Model, feature1: str, feature2: str, plot_type='contour',
-                               x_quantile=False, plot_pdp=False) -> (figure.Figure, axes.Axes):
+def inverse_scale(model: Model, feature: str, values: list, rounding: int = None) -> list:
+    """
+    Inverse scales numerical feature values from a given model's test set.
+    :param model: A fitted Model object.
+    :param feature: The feature name for which the values will be inverse scaled.
+    :param values: A list of numerical values or a single value to be inverse scaled.
+    :param rounding: The number of decimal places to round the feature values to. Defaults to None (no rounding).
+    :return: A list of inverse-scaled numerical feature values.
+    """
+
+    if feature in model.numerical_features:
+        dt = {}
+        arr_inv = np.unique(
+            model
+            .model[0]
+            .named_transformers_["num"]
+            .named_steps['scale']
+            .inverse_transform(
+                model.X_test_ohe[model.numerical_features])[:, model.numerical_features.index(feature)])
+        arr = np.unique(model.X_test_ohe[feature].array)
+        for i in range(len(arr)):
+            num = arr[i]
+            if rounding:
+                num = round(arr[i], rounding)
+            dt[num] = arr_inv[i]
+        res = []
+
+        try:
+            iter(values)
+        except TypeError as e:
+            values = [values]
+            log.debug("An expected error occurred. Program execution may continue: {}".format(e))
+
+        for value in values:
+            value = float(value)
+            try:
+                res_val = dt[value]
+            except KeyError as e:
+                log.debug("An expected error occurred. Program execution may continue: {}".format(e))
+                res_key, res_val = min(dt.items(), key=lambda x: abs(value - x[0]))
+                # 0.1 is the maximal allowed difference between the input value and the scaled value from the original
+                if abs(res_key-value) >= 0.099:
+                    log.error("No original value corresponds to a scaled value of {} for feature {}.\n"
+                              "All scaled values: original values for {} -> {}."
+                              .format(value, feature, feature, dt))
+                    raise e
+            res.append(res_val)
+    else:
+        log.error("Feature {} is not a numerical feature; therefore its value cannot be inverse scaled.\n"
+                  "All numerical features are: {}".format(feature, model.numerical_features))
+        res = values
+
+    return res
+
+
+def plot_multi_pdp_with_pdpbox(
+        model: Model,
+        feature1: str,
+        feature2: str,
+        plot_type='contour',
+        x_quantile=False,
+        plot_pdp=False)\
+        -> (figure.Figure, axes.Axes):
     """
     Plots a PDP for two features for a given model.
     :param model: The model for which a PDP should be created
     :param feature1: Feature to be plotted
     :param feature2: Feature with which feature1 interacts to be plotted
     :param plot_type: Type of the interact plot, can be 'contour' or 'grid'
-    :param x_quantile: Whether to construct x axis ticks using quantiles
+    :param x_quantile: Whether to construct x-axis ticks using quantiles
     :param plot_pdp: Whether to plot pdp for each feature
-    :return: (f, ax): (figure instance, matplotlib.axes._subplots.AxesSubplot)
+    :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
     features_to_plot = [feature1, feature2]
 
@@ -759,50 +830,71 @@ def plot_multi_pdp_with_pdpbox(model: Model, feature1: str, feature2: str, plot_
         model_features=model.features_ohe,
         features=features_to_plot)
 
-    fig, axes = pdp.pdp_interact_plot(
+    fig, ax = pdp.pdp_interact_plot(
         pdp_interact_out=pdp_interact_out,
         feature_names=features_to_plot,
         plot_type=plot_type,
         x_quantile=x_quantile,
         plot_pdp=plot_pdp)
 
-    return fig, axes
+    return fig, ax
 
 
-def plot_single_pdp_with_shap(model: Model, feature: str):
+def plot_single_pdp_with_shap(model: Model, feature: str) -> (figure.Figure, axes.Axes):
     """
     Plots a shap PDP for a single feature for a given model.
     :param model: The model for which a PDP should be plotted
     :param feature: Feature to be plotted
-    :return: void
+    :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
+    fig, ax = plt.subplots()
 
-    dependence_plot(ind=feature,
-                         interaction_index=feature,
-                         shap_values=model.shap_values[0],
-                         features=model.X_test_ohe)
-                         # features=model.X_test_ohe.sample(66, random_state=RANDOM_NUMBER))
+    dependence_plot(
+        ind=feature,
+        interaction_index=feature,
+        shap_values=model.shap_values[0],
+        features=model.X_test_ohe,
+        ax=ax,
+        show=False
+        # features=model.X_test_ohe.sample(66, random_state=RANDOM_NUMBER # for testing purposes
+    )
+
+    return fig, ax
 
 
-def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto'):
+def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto') -> (figure.Figure, axes.Axes):
     """
     Plots a shap PDP for two features for a given model.
     :param model: The model for which a PDP should be plotted
     :param feature1: Feature to be plotted
     :param feature2: Feature with which feature1 interacts to be plotted.
     If the value is 'auto' the feature with most interaction will be selected
-    :return: void
+    :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
+    fig, ax = plt.subplots()
 
-    dependence_plot(ind=feature1,
-                         interaction_index=feature2,
-                         shap_values=model.shap_values[0],
-                         features=model.X_test_ohe)
-                         # features=model.X_test_ohe.sample(66, random_state=RANDOM_NUMBER))
+    dependence_plot(
+        ind=feature1,
+        interaction_index=feature2,
+        shap_values=model.shap_values[0],
+        features=model.X_test_ohe,
+        ax=ax,
+        show=False
+        # features=model.X_test_ohe.sample(66, random_state=RANDOM_NUMBER # for testing purposes
+    )
+
+    return fig, ax
 
 
-def plot_single_pdp_with_skater(model: Model, feature: str, n_samples=1000, grid_resolution=50, grid_range=(0, 1),
-                                with_variance=True, figsize=(6, 4)):
+def plot_single_pdp_with_skater(
+        model: Model,
+        feature: str,
+        n_samples=1000,
+        grid_resolution=50,
+        grid_range=(0, 1),
+        with_variance=True,
+        figsize=(6, 4))\
+        -> (figure.Figure, axes.Axes):
     """
     Plots a skater PDP for a single feature for a given model.
     :param model: The model for which a PDP should be plotted
@@ -816,7 +908,7 @@ def plot_single_pdp_with_skater(model: Model, feature: str, n_samples=1000, grid
     :param grid_range: The percentile extrema to consider. 2 element tuple, increasing, bounded between 0 and 1.
     :param with_variance:
     :param figsize: Whether to include pdp error bars in the plots. Currently disabled for 3D plots for visibility.
-    :return: A plot
+    :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
 
     r = model.skater_interpreter.partial_dependence.plot_partial_dependence([feature],
@@ -826,11 +918,20 @@ def plot_single_pdp_with_skater(model: Model, feature: str, n_samples=1000, grid
                                                                             grid_range=grid_range,
                                                                             with_variance=with_variance,
                                                                             figsize=figsize)
-    return r
+
+    return r[0][0], r[0][1]
 
 
-def plot_multi_pdp_with_skater(model: Model, feature1: str, feature2: str, n_samples=1000, grid_resolution=100,
-                               grid_range=(0, 1), with_variance=False, figsize=(12, 5)):
+def plot_multi_pdp_with_skater(
+        model: Model,
+        feature1: str,
+        feature2: str,
+        n_samples=1000,
+        grid_resolution=100,
+        grid_range=(0, 1),
+        with_variance=False,
+        figsize=(12, 5))\
+        -> (figure.Figure, axes.Axes):
     """
     Plots a skater PDP for two features for a given model.
     :param model: The model for which a PDP should be plotted
@@ -845,7 +946,7 @@ def plot_multi_pdp_with_skater(model: Model, feature1: str, feature2: str, n_sam
     :param grid_range: The percentile extrema to consider. 2 element tuple, increasing, bounded between 0 and 1.
     :param with_variance:
     :param figsize: Whether to include pdp error bars in the plots. Currently disabled for 3D plots for visibility.
-    :return: A plot
+    :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
 
     r = model.skater_interpreter.partial_dependence.plot_partial_dependence([(feature1, feature2)],
@@ -855,7 +956,10 @@ def plot_multi_pdp_with_skater(model: Model, feature1: str, feature2: str, n_sam
                                                                             grid_range=grid_range,
                                                                             with_variance=with_variance,
                                                                             figsize=figsize)
-    return r
+    fig = r[0][0]
+    ax = r[0][1]
+
+    return fig, ax
 
 
 def generate_idx2ohe_dict(X: pd.DataFrame, cat_features: list, ohe_cat_features: list):
@@ -899,14 +1003,17 @@ def explain_single_instance(
         local_interpreter: LocalInterpreterType,
         model: Model,
         example: int,
-        kernel_width: float = None):
+        kernel_width: float = None,
+        force: bool = False):
     """
     Explain single instance (example) with a given interpreter type.
     :param local_interpreter: Type of interpreter to be used. Currently only LIME and SHAP are supported
     :param model: The model for which an instance should be explained
     :param example: The example to be explained - The row number from the X_test pd.DataFrame
-    :param kernel_width: (Optional) Set the kernel_width for LIME explanations. None results in the default kernel_width
-    which is 'sqrt(number of columns) * 0.75'.
+    :param kernel_width: (Optional) Only for LIME. Set the kernel_width for LIME explanations. None results in the
+     default kernel_width which is 'sqrt(number of columns) * 0.75'.
+    :param force: (Optional) Only for LIME. If LIME is already initialized for this example it will not be newly
+    initialized unless this flag is set to True.
     :return: Either a LIME or a SHAP explanation
     """
     explanation = None
@@ -914,39 +1021,65 @@ def explain_single_instance(
 
     start = time.time()
 
-    if local_interpreter is LocalInterpreterType.LIME:
-        model.init_lime(kernel_width=kernel_width)
-        explanation = explain_single_instance_with_lime(model, example)
-    elif local_interpreter is LocalInterpreterType.OPTIMIZED_LIME:
-        log.info("Initializing LIME - generating new explainer and optimizing the kernel width."
-                 " This operation may be time-consuming so please be patient.")
+    if local_interpreter is LocalInterpreterType.LIME or local_interpreter is LocalInterpreterType.OPTIMIZED_LIME:
+        if example not in model.example_lime_explainer or (example in model.example_lime_explainer and force):
+            if local_interpreter is LocalInterpreterType.LIME:
+                log.info("Initializing LIME - generating new explainer for example {} for {} kernel width."
+                         " This operation may be time-consuming so please be patient."
+                         .format(example,
+                                 "the default" if kernel_width is None
+                                 else kernel_width))
 
-        def explain_single_instance_with_lime_stability_wrapper(model: Model, example: int, kernel_width: float):
-            model.init_lime_stability(kernel_width=kernel_width)
-            _, csi, vsi = explain_single_instance_with_lime_stability(model, example)
-            return csi, vsi
+                model.init_lime(example=example, kernel_width=kernel_width)
+                explanation = explain_single_instance_with_lime(model, example)
+            else:
+                log.info("Initializing LIME - generating new explainer for example {} and optimizing the kernel width."
+                         " This operation may be time-consuming so please be patient.".format(example))
 
-        from math import sqrt
-        search_space = np.sort(np.append(
-            sqrt(len(model.X_train.columns)) * 0.75,
-            np.linspace(0.15, 8.15, num=50, dtype=float)))
-        f = partial(explain_single_instance_with_lime_stability_wrapper, model, example)
-        best_kernel_width, (csi, vsi) = optimize_function(f,
-                                                          search_space,
-                                                          num_samples=30,
-                                                          num_iterations=30,
-                                                          learning_rate=0.1)
-        log.info("The optimal kernel width for example {} and {} is {}.\n"
-                 "Variables Stability Index (VSI): {}\n"
-                 "Coefficients Stability Index (CSI): {}"
-                 .format(example, model.name, best_kernel_width, csi, vsi))
+                def explain_single_instance_with_lime_stability_wrapper(model: Model, example: int, kernel_width: float):
+                    model.init_lime_stability(example=example, kernel_width=kernel_width)
+                    _, csi, vsi = explain_single_instance_with_lime_stability(model, example)
+                    return csi, vsi
 
-        model.init_lime_stability(kernel_width=best_kernel_width)
-        explanation, _, _ = explain_single_instance_with_lime_stability(model, example)
+                from math import sqrt
+                search_space = np.sort(np.append(
+                    sqrt(len(model.X_train.columns)) * 0.75,
+                    np.linspace(0.15, 8.15, num=50, dtype=float)))
+                f = partial(explain_single_instance_with_lime_stability_wrapper, model, example)
+                best_kernel_width, (csi, vsi) = optimize_function(f,
+                                                                  search_space,
+                                                                  num_samples=30,
+                                                                  num_iterations=30,
+                                                                  learning_rate=0.1)
+                log.info("The optimal kernel width for example {} and {} is {}.\n"
+                         "Variables Stability Index (VSI): {}\n"
+                         "Coefficients Stability Index (CSI): {}"
+                         .format(example, model.name, best_kernel_width, csi, vsi))
+
+                model.init_lime_stability(example=example, kernel_width=best_kernel_width)
+                explanation, _, _ = explain_single_instance_with_lime_stability(model, example)
+
+            model.feature_value_weight_lime_local = {example: _get_lime_local_feature_value_weight(explanation)}
+        elif example in model.example_lime_explainer and not force:
+            log.debug("{} is already initialized for this example {}. "
+                      "Please use the force option if you want to reinitialize it."
+                      .format(local_interpreter.name, example))
+            try:
+                # if OPTIMIZED_LIME was used for the initialization
+                explanation, csi, vsi = explain_single_instance_with_lime_stability(model, example)
+
+                log.info("The optimal kernel width for example {} and {} is {}.\n"
+                         "Variables Stability Index (VSI): {}\n"
+                         "Coefficients Stability Index (CSI): {}"
+                         .format(example, model.name, explanation.domain_mapper.kernel_width, csi, vsi))
+            except AttributeError as e:
+                # if LIME was used for the initialization
+                explanation = explain_single_instance_with_lime(model, example)
     elif local_interpreter is LocalInterpreterType.SHAP:
         if not model.shap_values:
             model.init_shap()
         explanation = explain_single_instance_with_shap(model, example)
+        model.feature_value_weight_shap_local = {example: _get_shap_local_feature_value_weight(model, explanation)}
     else:
         log.error("Interpreter type {} is not yet supported for local interpretations. Please either use another one"
                   "or extend the functionality of this function".format(local_interpreter))
@@ -955,6 +1088,52 @@ def explain_single_instance(
     _log_elapsed_time(start, end, "generating a single instance explanation with {} is".format(local_interpreter.name))
 
     return explanation
+
+
+def _get_lime_local_feature_value_weight(explanation: Explanation) -> dict:
+    """
+    Generates a dictionary with a key of the following form "feature =/</> value" and a value
+    "weight for this feature and its value", e.g. hours-per-week <= 40.00: -0.0635
+    :param explanation: A LIME explanation.
+    :return: A sorted dictionary where the positive weights are sorted desc and the negatives asc
+    """
+    feature_value_weight_lime_local = dict(explanation.as_list())
+
+    feature_value_weight_lime_local_pos = dict(filter(lambda x: x[1] >= 0.0, feature_value_weight_lime_local.items()))
+    feature_value_weight_lime_local_neg = dict(filter(lambda x: x[1] < 0.0, feature_value_weight_lime_local.items()))
+
+    return {**_sort_dict_by_value(feature_value_weight_lime_local_pos, reverse=True),
+            **_sort_dict_by_value(feature_value_weight_lime_local_neg, reverse=False)}
+
+
+def _get_shap_local_feature_value_weight(model: Model, explanation: AdditiveForceVisualizer):
+    """
+    Generates a dictionary with a key of the following form "feature = value (scaled value)" and a value
+    "weight for this feature and its value", e.g. hours-per-week = 38 (-0.24038488322015739): 0.017
+    :param model: The model for which the local feature=value(scaled value): weight dictionary should be generated.
+    :param explanation: A SHAP AdditiveForceVisualizer explanation.
+    :return: A sorted dictionary where the positive weights are sorted desc and the negatives asc
+    """
+    feature_value_weight_shap_local_pos = {}
+    feature_value_weight_shap_local_neg = {}
+    for key, value in explanation.data['features'].items():
+        feature_name = list(explanation.data['featureNames'])[int(key)]
+        effect = value['effect']
+        value = value['value']
+        new_key = "{} = {} ({})".format(
+                feature_name,
+                int(inverse_scale(model, feature_name, value, 2)[0]),
+                value) \
+            if feature_name in model.numerical_features \
+            else "{} = {}".format(feature_name, int(value))
+
+        if effect >= 0.0:
+            feature_value_weight_shap_local_pos[new_key] = effect
+        else:
+            feature_value_weight_shap_local_neg[new_key] = effect
+
+    return {**_sort_dict_by_value(feature_value_weight_shap_local_pos, reverse=True),
+            **_sort_dict_by_value(feature_value_weight_shap_local_neg, reverse=False)}
 
 
 def optimize_function(
@@ -1014,7 +1193,7 @@ def generate_single_instance_comparison(models: list, example: int) -> str:
     Compare models' decisions for a given example.
     :param models: All models to be compared
     :param example: The example, which is classified by the models
-    :return: An a string containing information whether each model's decision was right or not.
+    :return: A string containing information whether each model's decision was right or not.
     """
 
     classified = []
@@ -1050,18 +1229,27 @@ def generate_single_instance_explanation(local_interpreter: LocalInterpreterType
     """
 
     explanation = ""
+    not_initialized = False
 
-    if local_interpreter is LocalInterpreterType.LIME:
-        if not model.lime_explainer:
-            model.init_lime()
-        explanation = generate_single_instance_explanation_with_lime(model, example)
+    if local_interpreter is LocalInterpreterType.LIME or local_interpreter is LocalInterpreterType.OPTIMIZED_LIME:
+        if example in model.example_lime_explainer:
+            explanation = generate_single_instance_explanation_with_lime(model, example)
+        else:
+            not_initialized = True
     elif local_interpreter is LocalInterpreterType.SHAP:
-        if not model.shap_values:
-            model.init_shap()
-        explanation = generate_single_instance_explanation_with_shap(model, example)
+        if model.shap_values:
+            explanation = generate_single_instance_explanation_with_shap(model, example)
+        else:
+            not_initialized = True
     else:
         log.error("Interpreter type {} is not yet supported for local interpretations. Please either use another one"
                   "or extend the functionality of this function".format(local_interpreter))
+
+    if not_initialized:
+        log.error("{} is not initialized for example {}. "
+                  "Please initialize {} before trying to generate a textual explanation.\n"
+                  "Note: Use explain_single_instance for initialization of {}"
+                  .format(LocalInterpreterType.name, example, LocalInterpreterType.name, LocalInterpreterType.name))
 
     return explanation
 
@@ -1073,18 +1261,13 @@ def generate_single_instance_explanation_with_lime(model: Model, example: int) -
     :param example: Example, that should be explained
     :return: An explanation.
     """
-
-    explanation = explain_single_instance(LocalInterpreterType.LIME, model, example)
-    feature_value = dict(explanation.as_list())
-    prediction_probability = explanation.predict_proba[_get_prediction_for_example(model, example)]
-
-    pos_elems = len(list(filter(lambda x: (x >= 0.0), list(feature_value.values()))))
-    neg_elems = len(list(filter(lambda x: (x < 0.0), list(feature_value.values()))))
+    prediction_probability = _get_prediction_for_example(model, example, approximate=False)
+    feature_value_weight_lime_local = model.feature_value_weight_lime_local[example]
 
     return _generate_generic_single_instance_explanation(
         model.name,
-        _strip_dict(feature_value, pos_elems if pos_elems <= 3 else 3, True),
-        _strip_dict(feature_value, neg_elems if neg_elems <= 2 else 2, False),
+        dict(filter(lambda x: x[1] >= 0.0, feature_value_weight_lime_local.items())),
+        dict(filter(lambda x: x[1] < 0.0, feature_value_weight_lime_local.items())),
         prediction_probability,
         'LIME')
 
@@ -1092,29 +1275,22 @@ def generate_single_instance_explanation_with_lime(model: Model, example: int) -
 def generate_single_instance_explanation_with_shap(model: Model, example: int) -> str:
     """
     Generate an explanation for a single instance (example) for a model with SHAP.
-    :param model: Model for whose decison an explanation shall be generated
+    :param model: Model for whose decision an explanation shall be generated
     :param example: Example, that should be explained
     :return: An explanation.
     """
-    prediction = _get_prediction_for_example(model, example)
+    feature_value_weight_shap_local = model.feature_value_weight_shap_local[example]
 
-    base_value = model.shap_kernel_explainer.expected_value[prediction]
-    shap_values = model.shap_values[prediction][example, :]
-    features = list(model.X_test_ohe.iloc[example, :].index)
+    # prediction = _get_prediction_for_example(model, example, approximate=True)
+    # base_value = model.shap_kernel_explainer.expected_value[prediction]
+    # shap_values = model.shap_values[prediction][example, :]
+    # prediction_probability = np.sum(shap_values) + base_value
 
-    feature_value = {}
-
-    for count in range(len(features)):
-        feature_value[features[count]] = shap_values[count]
-
-    prediction_probability = np.sum(shap_values) + base_value
-
-    pos_elems, neg_elems = _get_elements_number(list(feature_value.values()), 3, 2)
-
+    prediction_probability = _get_prediction_for_example(model, example, approximate=False)
     return _generate_generic_single_instance_explanation(
         model.name,
-        _strip_dict(feature_value, pos_elems, True),
-        _strip_dict(feature_value, neg_elems, False),
+        dict(filter(lambda x: x[1] >= 0.0, feature_value_weight_shap_local.items())),
+        dict(filter(lambda x: x[1] < 0.0, feature_value_weight_shap_local.items())),
         prediction_probability,
         'SHAP')
 
@@ -1157,49 +1333,16 @@ def _generate_generic_single_instance_explanation_helper(d: dict, model_name: st
     keys = list(d.keys())
     values = list(d.values())
 
-    adverb_first = ['mostly', 'mainly', 'primarily', 'largely']
-    adjective_second = ['largest', 'biggest', 'most substantial', 'most considerable']
-    adjective_third = ['important', 'influential', 'impactful', 'effective']
-    verb = ['impact', 'influence', 'affect', 'change']
-
     for c in range(len(d)):
         value_rounded = round(values[c], 4)
         if (c+1) == 1:
-            msg = msg + "The feature that {} {}s {}'s {} prediction probability is {} with value of {}.\n"\
-                .format(choice(adverb_first), choice(verb), model_name, desc, keys[c], value_rounded)
-        elif (c+1) == 2:
-            msg = msg + "The feature with the second {} {} on {}'s {} prediction probability is {} with value of {}.\n"\
-                .format(choice(adjective_second), choice(verb), model_name, desc, keys[c], value_rounded)
-        elif (c+1) == 3:
-            msg = msg + "The third most {} feature for the {} prediction probability of {} is {} with value of {}\n"\
-                .format(choice(adjective_third), desc, model_name, keys[c], value_rounded)
+            msg = msg + "The most impactful feature for {}'s {} prediction probability is {} with value of {}.\n"\
+                .format(model_name, desc, keys[c], value_rounded)
         else:
-            msg = msg + "The {} feature that {} the {} prediction probability of {} is {} with value of {}\n"\
-                .format(_get_nth_ordinal(c+1), choice(verb), desc, model_name, keys[c], value_rounded)
+            msg = msg + "The {} most impactful feature for {}'s {} prediction probability is {} with value of {}.\n"\
+                .format(_get_nth_ordinal(c+1), model_name, desc, keys[c], value_rounded)
 
     return msg
-
-
-def _get_elements_number(l: list, pos_upper_bound: int = 3, neg_upper_bound: int = 2) -> (int, int):
-    """
-    Count all elements that are positive and all that negative and differ from zero.
-     If the there are more elements than the upper bound, return the upper bound.
-    :param l: The list that has to be counted
-    :param pos_upper_bound: The upper bound used as a positive counter limiter
-    :param neg_upper_bound: The upper bound used as a negative counter limiter
-    :return: A tuple containing the positive and negative element number.
-    """
-
-    count_pos = 0
-    count_neg = 0
-
-    for v in l:
-        if v != 0 and v > 0 and count_pos != pos_upper_bound:
-            count_pos = count_pos + 1
-        elif v != 0 and v < 0 and count_neg != neg_upper_bound:
-            count_neg = count_neg + 1
-
-    return count_pos, count_neg
 
 
 def _strip_dict(d: dict, n: int, reverse: bool) -> dict:
@@ -1235,15 +1378,17 @@ def _sort_dict_by_value(d: dict, reverse: bool) -> dict:
     return {k: v for k, v in sorted(d.items(), key=lambda item: item[1], reverse=reverse)}
 
 
-def _get_prediction_for_example(model: Model, example: int) -> int:
+def _get_prediction_for_example(model: Model, example: int, approximate: bool) -> int:
     """
-    Returns either 0 or 1 for a classifier depending on the how the example was classified by the model.
+    Returns the prediction probability for this example depending on how it was classified by the model.
     :param model: Model for which the example shall be classified
     :param example: Example to be classified
-    :return: Either 0 or 1 depending on the result
+    :param approximate: When True the result will be rounded to either 0 or 1 depending on the classification
+    :return: The prediction probability for this example as a floating point number between [0.0; 1.0] or [0, 1] if
+    approximation is applied
     """
     predictions = list(model.model.predict_proba(model.X_test)[example])
-    return predictions.index(max(predictions))
+    return round(max(predictions)) if approximate else max(predictions)
 
 
 def convert_to_lime_format(X, categorical_names, col_names=None, invert=False):
@@ -1308,11 +1453,11 @@ def _explain_single_instance_with_lime(model: Model, example: int) -> (callable,
 
     custom_model_predict_proba = partial(custom_predict_proba, model=model.model)
     observation = convert_to_lime_format(model.X_test.iloc[[example], :], model.idx2ohe).values[0]
-    explanation = model.lime_explainer.explain_instance(
+    explanation = model.example_lime_explainer[example].explain_instance(
         observation,
         custom_model_predict_proba,
         num_samples=15000,
-        num_features=len(model.numerical_features))
+        num_features=len(model.numerical_features) + len(model.categorical_features))
 
     return explanation, custom_model_predict_proba, observation
 
@@ -1340,7 +1485,7 @@ def explain_single_instance_with_lime_stability(model: Model, example: int):
     """
     explanation, custom_model_predict_proba, observation = _explain_single_instance_with_lime(model, example)
 
-    csi, vsi = model.lime_explainer.check_stability(
+    csi, vsi = model.example_lime_explainer[example].check_stability(
         observation,
         custom_model_predict_proba,
         num_features=len(model.numerical_features))
@@ -1355,12 +1500,14 @@ def explain_single_instance_with_shap(model: Model, example: int):
     :param example: Example number to be explained
     :return: A plot for the explanation.
     """
-    prediction = _get_prediction_for_example(model, example)
+    prediction = _get_prediction_for_example(model, example, approximate=True)
 
-    return force_plot(
+    fp = force_plot(
         model.shap_kernel_explainer.expected_value[prediction],
         model.shap_values[prediction][example, :],
         model.X_test_ohe.iloc[example, :])
+
+    return fp
 
 
 def get_test_examples(model: Model, examples_type: ExampleType, number_of_examples: int) -> list:
