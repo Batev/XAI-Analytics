@@ -494,7 +494,92 @@ def plot_feature_importance_with_shap(model: Model, plot_type="bar") -> dict:
     return feature_mean
 
 
-def calculate_rbos(
+def calculate_model_rbo(
+        model: Model,
+        d_min: int = 5,
+        d_max: int = None,
+        step: int = 1)\
+        -> pd.DataFrame:
+    """
+    TODO: Save the FIs for a model in a dict {'ELI5': {'age': 0.15, 'capital-gain': 0.11, ...}, 'SKATER': {...}, ...}
+    and create an new function for calculating the RBOs combining this funciton and calculate_feature_importance_rbos()
+
+    Calculates the rank-biased overlap (RBO) between all feature importance combinations for a given model.
+    The persistence (p-value) for the RBO algorithm is calculated (d-1)/d, where d is the depth. The RBO for each
+    combination is calculated multiple times based on the minimal depth (d_min) value, maximal depth (d_max) and the
+    step value.
+    :param model: The model for which the RBOs for all its FIs should be calculated.
+    :param d_min: The minimal depth for which the RBOs should be calculated. The maximal depth is length of the shortest
+    feature importance list of this type or the explicitly set input parameter.
+    :param d_max: The maximal depth for which the RBOs should be calculated. If none, the shortest feature importance
+    list length will be used as maximal depth.
+    :param step: The step with which the depth should be increased on each iteration until the maximal depth is reached.
+    :return: A pandas.DataFrame consisting of multiple columns. The first column is with the persistence (p) values,
+     the second column is with the depth (d) values, then a column for each combination of the feature importances and
+    the last column is the mean RBO value from all combinations for this row.
+    """
+    from itertools import combinations
+
+    not_initialized = False
+    d_max_fi = 0
+    fis = {}
+
+    if model.feature_weight_skater and model.feature_weight_shap:
+        if model.model_type.algorithm is Algorithm.SVC or model.model_type.algorithm is Algorithm.XGB:
+            fis[FeatureImportanceType.SKATER.name] = model.feature_weight_skater
+            fis[FeatureImportanceType.SHAP.name] = model.feature_weight_shap
+            d_max_fi = min(len(model.feature_weight_skater),
+                           len(model.feature_weight_shap))
+        else:
+            if model.feature_weight_eli5:
+                fis[FeatureImportanceType.ELI5.name] = model.feature_weight_eli5
+                fis[FeatureImportanceType.SKATER.name] = model.feature_weight_skater
+                fis[FeatureImportanceType.SHAP.name] = model.feature_weight_shap
+                d_max_fi = min(len(model.feature_weight_eli5),
+                               len(model.feature_weight_skater),
+                               len(model.feature_weight_shap))
+            else:
+                not_initialized = True
+    else:
+        not_initialized = True
+
+    if not d_max:
+        d_max = d_max_fi
+
+    if not_initialized:
+        d_max = 0
+        log.error(
+            "All feature importance techniques should be initialized for model {} before calculating the RBOs for them."
+            " Please execute the generate_feature_importance_plot method for all techniques."
+            .format(model.model_type.algorithm))
+
+    p_d = {round((d-1)/d, 3): d for d in range(d_min, d_max+1, step)}
+    df = pd.DataFrame({
+        'p': list(p_d.keys()),
+        'd': list(p_d.values())
+    })
+
+    for fi_1_name, fi_2_name in combinations(fis, 2):
+        fi_1_value = fis[fi_1_name]
+        fi_2_value = fis[fi_2_name]
+        rbos = []
+        for p, d in p_d.items():
+            rbo = _calculate_rbo(fi_1_value, fi_2_value, d, p, True)
+            if rbo is not None:
+                rbos.append(rbo)
+            else:
+                log.debug("Feature importance of type {}, {} or both is/are empty for model: {}."
+                          " Please calculate the feature importance for these models."
+                          .format(fi_1_name, fi_2_name, model.name))
+        if rbos:
+            df['{}_{}'.format(fi_1_name, fi_2_name)] = rbos
+    df['Mean'] = round(df.iloc[:, 2:].mean(axis=1), 3)
+    df.style.highlight_max()
+
+    return df
+
+
+def calculate_feature_importance_rbo(
         type: FeatureImportanceType,
         models: list,
         d_min: int = 5,
@@ -526,7 +611,7 @@ def calculate_rbos(
                 lengths.append(len(model.feature_weight_eli5))
             elif type == FeatureImportanceType.SKATER and model.feature_weight_skater:
                 lengths.append(len(model.feature_weight_skater))
-            elif type == FeatureImportanceType.SHAP and model.feature_weight_skater:
+            elif type == FeatureImportanceType.SHAP and model.feature_weight_shap:
                 lengths.append(len(model.feature_weight_shap))
             else:
                 log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
