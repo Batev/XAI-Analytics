@@ -116,7 +116,7 @@ def get_column_transformer(numerical: list, categorical: list) -> ColumnTransfor
                     ('cat', categorical_transformer, categorical)])
 
 
-def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) -> Pipeline:
+def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) -> GridSearchCV:
     """
     Returns a new pipeline depending on the chosen algorithm.
     :param ct: A column transformer used in the pipeline
@@ -124,45 +124,74 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
     :param data_size: The size of the data used for training.
     :return: A new pipeline
     """
+    grid_values = {}
 
     if algorithm is Algorithm.LOGISTIC_REGRESSION:
         estimator = LogisticRegression(
-            max_iter=1000,
-            solver='liblinear',
-            C=1,
-            penalty='l1',
-            dual=False,
+            max_iter=10000,
             random_state=RANDOM_NUMBER)
+        grid_values = [
+            {
+                'model__solver': ['liblinear'],
+                # == [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000]
+                'model__C': np.logspace(-4, 4, 3),
+                'model__penalty': ['l1', 'l2'],
+                'model__dual': [False]
+            },
+            {
+                'model__solver': ['saga'],
+                'model__C': np.logspace(-4, 4, 9),
+                'model__penalty': ['l1', 'l2', 'elasticnet', 'none']
+            },
+            {
+                'model__solver': ['newton-cg', 'lbfgs', 'sag'],
+                'model__C': np.logspace(-4, 4, 9),
+                'model__penalty': ['l2', 'none']
+            }
+        ]
     elif algorithm is Algorithm.DECISION_TREE:
-        estimator = DecisionTreeClassifier(
-            criterion='gini',
-            splitter='best',
-            max_depth=8,
-            max_features=1.0,
-            random_state=RANDOM_NUMBER)
+        estimator = DecisionTreeClassifier(random_state=RANDOM_NUMBER)
+        grid_values = [
+            {
+                'model__criterion': ['gini', 'entropy'],
+                'model__splitter': ['best', 'random'],
+                'model__max_depth': np.linspace(2, 64, num=20, dtype=int),
+                'model__max_features': ['auto', 'sqrt', 'log2', 0.25, 0.5, 0.75, 1.0, None]
+            }]
     elif algorithm is Algorithm.RANDOM_FOREST:
         estimator = RandomForestClassifier(
-            criterion='gini',
-            n_estimators=1200,
-            max_depth=22,
-            max_features=0.25,
-            min_samples_split=10,
-            min_samples_leaf=2,
-            bootstrap=True,
             random_state=RANDOM_NUMBER,
             n_jobs=-1)
+        grid_values = [
+            {
+                'model__criterion': ['gini', 'entropy', 'log_loss'],
+                'model__n_estimators': np.linspace(100, 10000, num=10, dtype=int),
+                'model__max_depth': np.linspace(2, 64, num=10, dtype=int),
+                'model__max_features': ['sqrt', 'log2', 0.25, 0.5, 0.75, 1.0, None],
+                'model__min_samples_split': [2, 5, 10],
+                'model__min_samples_leaf': [1, 2, 4],
+                'model__bootstrap': [True, False]
+            }
+        ]
     elif algorithm is Algorithm.XGB:
         estimator = XGBClassifier(
             random_state=RANDOM_NUMBER,
             n_jobs=-1)
     elif algorithm is Algorithm.SVC:
-        estimator = SVC(
-            kernel="rbf",
-            C=100,
-            gamma=0.01,
-            random_state=RANDOM_NUMBER,
-            probability=True,
-            verbose=False)
+        grid_values = {
+            # ['0.000001', '0.000010', '0.000100', '0.001000', '0.010000', '0.100000', '1.000000',
+            # '10.000000', '100.000000', '1000.000000', '10000.000000', '100000.000000', '1000000.000000']
+            'model__C': np.logspace(-6, 6, 13),
+            # ['0.000001', '0.000010', '0.000100', '0.001000', '0.010000', '0.100000', '1.000000',
+            # '10.000000', '100.000000', '1000.000000', '10000.000000', '100000.000000', '1000000.000000',
+            # '0.000001', '0.000010', '0.000100', '0.001000', '0.010000', '0.100000', '1.000000', '10.000000',
+            # '100.000000', '1000.000000', '10000.000000', '100000.000000', '1000000.000000']
+            'model__gamma': np.logspace(-6, 3, 10)
+        }
+        estimator = SVC(kernel="rbf",
+                        random_state=RANDOM_NUMBER,
+                        probability=True,
+                        verbose=False)
     elif algorithm is Algorithm.LINEAR_REGRESSION:
         estimator = LinearRegression(n_jobs=-1)
     elif algorithm is Algorithm.SVM:
@@ -171,8 +200,18 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
         raise NotImplementedError
 
     pipeline = Pipeline([("preprocessor", ct), ("model", estimator)])
-
-    return pipeline
+    # scoring = ['accuracy', 'f1']
+    scoring = 'accuracy'
+    if algorithm is Algorithm.LOGISTIC_REGRESSION or algorithm is Algorithm.DECISION_TREE:
+        search = GridSearchCV(estimator=pipeline, param_grid=grid_values, scoring=scoring,
+                              cv=5, return_train_score=True, verbose=2, n_jobs=-1)
+    else:
+        search = RandomizedSearchCV(estimator=pipeline, param_distributions=grid_values, scoring=scoring,
+                                    cv=5, random_state=RANDOM_NUMBER,
+                                    refit="accuracy", verbose=2,
+                                    return_train_score=True, n_iter=50,
+                                    n_jobs=-1)
+    return search
 
 
 def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Series)\
@@ -389,6 +428,9 @@ def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: p
     model.fit(X_train, y_train)
     end = time.time()
     _log_elapsed_time(start, end, "training a {} classifier is".format(model_type.algorithm.name))
+
+    log.info("Best parameters: {}".format(model.best_params_))
+    model = model.best_estimator_
 
     # Generate predictions
     y_pred = model.predict(X_test)
