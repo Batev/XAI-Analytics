@@ -8,6 +8,7 @@ httplib2
 imblearn
 jupyter
 lime
+lime-stability
 matplotlib
 multipledispatch
 multiprocess
