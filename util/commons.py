@@ -692,6 +692,73 @@ def calculate_feature_importance_rbo(
     return df
 
 
+def calculate_baseline_rbo(
+        d_min: int = 5,
+        d_max: int = None,
+        step: int = 1,
+        num_features: int = 64,
+        num_samples: int = 100) -> pd.DataFrame:
+    """
+    A function to calculate the baseline RBO values for a given minimal depth ("d_min"), maximal depth ("d_max"),
+     and "step" for increasing the depth. The persistence of the RBOs is calculated with the following formula:
+     "(d-1)/d". A "num_samples" randomly shuffled feature importance lists will be created with "num_features" number
+      of features. A pandas.DataFrame is returned with "d_max"-"d_min" number of rows, a column for the depth, a column
+      for the persistence, and a column for the mean of the calculated RBOs for this depth and persistence.
+    :param d_min: The minimal depth that should be considered.
+    :param d_max: The maximum depth that should be considered. Should > "d_min".
+    :param step: The step for increasing the depth from "d_min" to "d_max".
+    :param num_features: The full number of features in the randomized lists. Should be >= "d_max".
+    :param num_samples: The number of randomized lists (models) to be created. Note: All possible list combinations of
+    two lists will be considered resulting in "math.comb(num_samples, 2)" number of iterations.
+    :return: A pandas.DataFrame with columns p, d, and Mean.
+    """
+
+    p_d = {round((d-1)/d, 3): d for d in range(d_min, d_max+1, step)}
+    df = pd.DataFrame({
+        'p': list(p_d.keys()),
+        'd': list(p_d.values())
+    })
+
+    import random
+    from itertools import combinations
+
+    random_numbers = []
+
+    while len(random_numbers) < num_features:
+        new_number = random.randint(0, num_features)
+        if new_number not in random_numbers:
+            random_numbers.append(new_number)
+
+    random_dicts = []
+    for _ in range(num_samples):
+        list_copy = random_numbers.copy()
+        random.shuffle(list_copy)
+        random_dicts.append({str(key): key for key in list_copy})
+
+    rbos = []
+    # could use the binomial coefficient instead of counting manually
+    # total_combinations = math.comb(num_samples, 2)
+    total_combinations = 0
+
+    for dict1, dict2 in combinations(random_dicts, 2):
+        total_combinations = total_combinations + 1
+        iter = 0
+        for p, d in p_d.items():
+            rbo = None
+            rbo = _calculate_rbo(dict1, dict2, d, p, True)
+            if len(rbos) <= iter:
+                rbos.append(rbo)
+            else:
+                rbos[iter] = rbos[iter] + rbo
+            iter = iter + 1
+
+    rbos = [rbo/total_combinations for rbo in rbos]
+    df['Mean'] = rbos
+    df.style.highlight_max()
+
+    return df
+
+
 def _calculate_rbo(feature_weight_1: dict, feature_weight_2: dict, d: int, p: int, ext: bool = True) -> float:
     """
     Calculates a single rank-biased overlap (RBO) value for two models' feature importances.
