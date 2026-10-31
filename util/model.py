@@ -37,12 +37,19 @@ class ModelType:
     def problem_type(self, new_value):
         self._algorithm = None
         if new_value == ProblemType.CLASSIFICATION:
-            self._algorithm_options = [Algorithm.LOGISTIC_REGRESSION.name, Algorithm.DECISION_TREE.name,
-                                       Algorithm.RANDOM_FOREST.name, Algorithm.XGB.name, Algorithm.SVC.name]
+            self._algorithm_options = [
+                Algorithm.LOGISTIC_REGRESSION.name,
+                Algorithm.DECISION_TREE.name,
+                Algorithm.RANDOM_FOREST.name,
+                Algorithm.XGB.name,
+                Algorithm.SVC.name,
+            ]
         elif new_value == ProblemType.REGRESSION:
             self._algorithm_options = [Algorithm.LINEAR_REGRESSION.name, Algorithm.SVM.name]
         else:
-            raise NotImplementedError("Other problem types than classification and regression are not supported.")
+            raise NotImplementedError(
+                "Other problem types than classification and regression are not supported."
+            )
 
         self._problem_type = new_value
 
@@ -55,8 +62,11 @@ class ModelType:
         if new_value.name in self._algorithm_options:
             self._algorithm = new_value
         else:
-            raise ValueError("Invalid algorithm value {}. The algorithm value must be in {}"
-                             .format(new_value, self._algorithm_options))
+            raise ValueError(
+                "Invalid algorithm value {}. The algorithm value must be in {}".format(
+                    new_value, self._algorithm_options
+                )
+            )
 
     @property
     def algorithm_options(self):
@@ -64,7 +74,15 @@ class ModelType:
 
 
 class Model:
-    def __init__(self, id: int, name: str, model: Pipeline, X: pd.DataFrame, y: pd.Series, model_type: ModelType):
+    def __init__(
+        self,
+        id: int,
+        name: str,
+        model: Pipeline,
+        X: pd.DataFrame,
+        y: pd.Series,
+        model_type: ModelType,
+    ):
         self._id = id
         self._name = name
         self._model = model
@@ -193,7 +211,6 @@ class Model:
     def y_train(self, new_value):
         self._y_train = new_value
 
-
     @property
     def predictions(self):
         return self._predictions
@@ -201,7 +218,6 @@ class Model:
     @predictions.setter
     def predictions(self, new_value):
         self._predictions = new_value
-
 
     @property
     def shap_values(self):
@@ -227,16 +243,17 @@ class Model:
         import shap
 
         if not self.shap_values:
+            log.info(
+                "Initializing Shap - calculating shap values."
+                " This operation is time-consuming so please be patient."
+            )
 
-            log.info("Initializing Shap - calculating shap values."
-                     " This operation is time-consuming so please be patient.")
-
-            logger = log.getLogger('shap')
+            logger = log.getLogger("shap")
             logger.setLevel(log.WARN)
 
-            shap_kernel_explainer = shap.KernelExplainer(self.model[1].predict_proba,
-                                                         shap.kmeans(self.X_test_ohe, 1),
-                                                         n_jobs=-1)
+            shap_kernel_explainer = shap.KernelExplainer(
+                self.model[1].predict_proba, shap.kmeans(self.X_test_ohe, 1), n_jobs=-1
+            )
             shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe)
             # from util.commons import RANDOM_NUMBER
             # shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe.sample(66, random_state=RANDOM_NUMBER))
@@ -271,20 +288,23 @@ class Model:
         from skater.model import InMemoryModel
 
         if not self.skater_interpreter or not self.skater_model:
-
-            log.info("Initializing Skater - generating new in-memory model."
-                     " This operation may be time-consuming so please be patient.")
+            log.info(
+                "Initializing Skater - generating new in-memory model."
+                " This operation may be time-consuming so please be patient."
+            )
 
             self.skater_interpreter = Interpretation(
                 training_data=self.X_train_ohe,
                 training_labels=self.y_train,
-                feature_names=self.features_ohe)
+                feature_names=self.features_ohe,
+            )
 
             self.skater_model = InMemoryModel(
                 self.model[1].predict_proba,
                 examples=self.X_test_ohe,
                 target_names=target_names,
-                unique_values=self.y_train.unique())
+                unique_values=self.y_train.unique(),
+            )
         else:
             log.info("Skater is already initialized.")
 
@@ -312,7 +332,8 @@ class Model:
             categorical_names=categorical_names,
             categorical_features=categorical_names.keys(),
             discretize_continuous=True,
-            random_state=RANDOM_NUMBER)
+            random_state=RANDOM_NUMBER,
+        )
 
         self.example_lime_explainer[example] = explainer
 
@@ -340,7 +361,7 @@ class Model:
             categorical_names=categorical_names,
             categorical_features=categorical_names.keys(),
             discretize_continuous=True,
-            random_state=RANDOM_NUMBER
+            random_state=RANDOM_NUMBER,
         )
 
         self.example_lime_explainer[example] = explainer

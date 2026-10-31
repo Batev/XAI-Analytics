@@ -43,7 +43,6 @@ class Datasets(enum.Enum):
 
 
 class Dataset:
-
     def __init__(self, id: Datasets, name: str, url: str, df: pd.DataFrame):
         self._id = id
         self._name = name
@@ -65,7 +64,7 @@ class Dataset:
         dataset_id = Datasets.other
         status, content = is_url_valid(url=url)
         if status:
-            df = pd.read_csv(StringIO(content.decode('utf-8')))
+            df = pd.read_csv(StringIO(content.decode("utf-8")))
         else:
             msg = "Invalid URL to a dataset: {}.".format(url)
             log.error(msg)
@@ -202,30 +201,33 @@ class Dataset:
             return eval(cmd)
         elif id.value == 27:
             from xai.data import load_census
+
             return load_census()
         elif id.value == 28:
             return Dataset.from_url(
                 "Risk Factors for Cervical Cancer",
-                "https://archive.ics.uci.edu/ml/machine-learning-databases/00383/risk_factors_cervical_cancer.csv").df
+                "https://archive.ics.uci.edu/ml/machine-learning-databases/00383/risk_factors_cervical_cancer.csv",
+            ).df
         elif id.value == 29:
-            url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/00380/YouTube-Spam-Collection-v1.zip'
+            url = "https://archive.ics.uci.edu/ml/machine-learning-databases/00380/YouTube-Spam-Collection-v1.zip"
             status, content = is_url_valid(url=url)
             if status:
-                file_name = url.rsplit('/', 1)[-1]
-                with urlopen(url) as in_stream, open(file_name, 'wb') as out_file:
+                file_name = url.rsplit("/", 1)[-1]
+                with urlopen(url) as in_stream, open(file_name, "wb") as out_file:
                     copyfileobj(in_stream, out_file)
-                zip_file_object = zipfile.ZipFile(file_name, 'r')
+                zip_file_object = zipfile.ZipFile(file_name, "r")
                 dataframes = []
-                unsupported_os = '__MACOSX'
+                unsupported_os = "__MACOSX"
                 for file_name in zip_file_object.namelist():
-                    if file_name.endswith('.csv'):
+                    if file_name.endswith(".csv"):
                         if not file_name.startswith(unsupported_os):
                             file = zip_file_object.open(file_name)
                             content = file.read()
-                            dataframes.append(pd.read_csv(StringIO(content.decode('utf-8'))))
+                            dataframes.append(pd.read_csv(StringIO(content.decode("utf-8"))))
                         else:
-                            msg = "{} encoding is not supported, only UTF-8. File '{}' will be ignored"\
-                                .format(unsupported_os, file_name)
+                            msg = "{} encoding is not supported, only UTF-8. File '{}' will be ignored".format(
+                                unsupported_os, file_name
+                            )
                             log.warning(msg)
                 return pd.concat(dataframes, ignore_index=True)
             else:
@@ -253,7 +255,8 @@ def is_url_valid(url: str, disable_ssl_certificate_validation=True) -> (bool, by
     :return: A tuple (status, content): (True, when the url returns a valid response code, The content of the message)
     """
     import httplib2
+
     h = httplib2.Http(disable_ssl_certificate_validation=disable_ssl_certificate_validation)
     resp, content = h.request(url)
-    status = int(resp['status'])
+    status = int(resp["status"])
     return (200 >= status < 300), content

@@ -15,8 +15,14 @@ from shap.plots._force import AdditiveForceVisualizer
 from lime.explanation import Explanation
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
-from sklearn.metrics import accuracy_score, classification_report, r2_score,\
-    mean_squared_error, plot_confusion_matrix, plot_roc_curve
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    r2_score,
+    mean_squared_error,
+    plot_confusion_matrix,
+    plot_roc_curve,
+)
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.svm import SVC
@@ -39,14 +45,14 @@ RANDOM_NUMBER = None
 TEST_SPLIT_SIZE = 0.3
 
 
-log.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+log.basicConfig(format="%(asctime)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S")
 log.getLogger().setLevel(log.INFO)
 
 # debug logger generates too much output
-log.getLogger('matplotlib.font_manager').disabled = True
+log.getLogger("matplotlib.font_manager").disabled = True
 
 # remove DataFrame display limitation
-pd.set_option('display.max_columns', 50)
+pd.set_option("display.max_columns", 50)
 
 
 class FeatureImportanceType(enum.Enum):
@@ -101,19 +107,23 @@ def get_column_transformer(numerical: list, categorical: list) -> ColumnTransfor
     :return: A new column transformer
     """
 
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scale', StandardScaler())
-        ])
+    numeric_transformer = Pipeline(
+        steps=[("imputer", SimpleImputer(strategy="median")), ("scale", StandardScaler())]
+    )
 
-    categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore', drop='if_binary'))])
+    categorical_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="constant", fill_value="missing")),
+            ("onehot", OneHotEncoder(handle_unknown="ignore", drop="if_binary")),
+        ]
+    )
 
     return ColumnTransformer(
-                transformers=[
-                    ('num', numeric_transformer, numerical),
-                    ('cat', categorical_transformer, categorical)])
+        transformers=[
+            ("num", numeric_transformer, numerical),
+            ("cat", categorical_transformer, categorical),
+        ]
+    )
 
 
 def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) -> GridSearchCV:
@@ -127,71 +137,63 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
     grid_values = {}
 
     if algorithm is Algorithm.LOGISTIC_REGRESSION:
-        estimator = LogisticRegression(
-            max_iter=10000,
-            random_state=RANDOM_NUMBER)
+        estimator = LogisticRegression(max_iter=10000, random_state=RANDOM_NUMBER)
         grid_values = [
             {
-                'model__solver': ['liblinear'],
+                "model__solver": ["liblinear"],
                 # == [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000]
-                'model__C': np.logspace(-4, 4, 3),
-                'model__penalty': ['l1', 'l2'],
-                'model__dual': [False]
+                "model__C": np.logspace(-4, 4, 3),
+                "model__penalty": ["l1", "l2"],
+                "model__dual": [False],
             },
             {
-                'model__solver': ['saga'],
-                'model__C': np.logspace(-4, 4, 9),
-                'model__penalty': ['l1', 'l2', 'elasticnet', 'none']
+                "model__solver": ["saga"],
+                "model__C": np.logspace(-4, 4, 9),
+                "model__penalty": ["l1", "l2", "elasticnet", "none"],
             },
             {
-                'model__solver': ['newton-cg', 'lbfgs', 'sag'],
-                'model__C': np.logspace(-4, 4, 9),
-                'model__penalty': ['l2', 'none']
-            }
+                "model__solver": ["newton-cg", "lbfgs", "sag"],
+                "model__C": np.logspace(-4, 4, 9),
+                "model__penalty": ["l2", "none"],
+            },
         ]
     elif algorithm is Algorithm.DECISION_TREE:
         estimator = DecisionTreeClassifier(random_state=RANDOM_NUMBER)
         grid_values = [
             {
-                'model__criterion': ['gini', 'entropy'],
-                'model__splitter': ['best', 'random'],
-                'model__max_depth': np.linspace(2, 64, num=20, dtype=int),
-                'model__max_features': ['auto', 'sqrt', 'log2', 0.25, 0.5, 0.75, 1.0, None]
-            }]
+                "model__criterion": ["gini", "entropy"],
+                "model__splitter": ["best", "random"],
+                "model__max_depth": np.linspace(2, 64, num=20, dtype=int),
+                "model__max_features": ["auto", "sqrt", "log2", 0.25, 0.5, 0.75, 1.0, None],
+            }
+        ]
     elif algorithm is Algorithm.RANDOM_FOREST:
-        estimator = RandomForestClassifier(
-            random_state=RANDOM_NUMBER,
-            n_jobs=-1)
+        estimator = RandomForestClassifier(random_state=RANDOM_NUMBER, n_jobs=-1)
         grid_values = [
             {
-                'model__criterion': ['gini', 'entropy', 'log_loss'],
-                'model__n_estimators': np.linspace(100, 10000, num=10, dtype=int),
-                'model__max_depth': np.linspace(2, 64, num=10, dtype=int),
-                'model__max_features': ['sqrt', 'log2', 0.25, 0.5, 0.75, 1.0, None],
-                'model__min_samples_split': [2, 5, 10],
-                'model__min_samples_leaf': [1, 2, 4],
-                'model__bootstrap': [True, False]
+                "model__criterion": ["gini", "entropy", "log_loss"],
+                "model__n_estimators": np.linspace(100, 10000, num=10, dtype=int),
+                "model__max_depth": np.linspace(2, 64, num=10, dtype=int),
+                "model__max_features": ["sqrt", "log2", 0.25, 0.5, 0.75, 1.0, None],
+                "model__min_samples_split": [2, 5, 10],
+                "model__min_samples_leaf": [1, 2, 4],
+                "model__bootstrap": [True, False],
             }
         ]
     elif algorithm is Algorithm.XGB:
-        estimator = XGBClassifier(
-            random_state=RANDOM_NUMBER,
-            n_jobs=-1)
+        estimator = XGBClassifier(random_state=RANDOM_NUMBER, n_jobs=-1)
     elif algorithm is Algorithm.SVC:
         grid_values = {
             # ['0.000001', '0.000010', '0.000100', '0.001000', '0.010000', '0.100000', '1.000000',
             # '10.000000', '100.000000', '1000.000000', '10000.000000', '100000.000000', '1000000.000000']
-            'model__C': np.logspace(-6, 6, 13),
+            "model__C": np.logspace(-6, 6, 13),
             # ['0.000001', '0.000010', '0.000100', '0.001000', '0.010000', '0.100000', '1.000000',
             # '10.000000', '100.000000', '1000.000000', '10000.000000', '100000.000000', '1000000.000000',
             # '0.000001', '0.000010', '0.000100', '0.001000', '0.010000', '0.100000', '1.000000', '10.000000',
             # '100.000000', '1000.000000', '10000.000000', '100000.000000', '1000000.000000']
-            'model__gamma': np.logspace(-6, 3, 10)
+            "model__gamma": np.logspace(-6, 3, 10),
         }
-        estimator = SVC(kernel="rbf",
-                        random_state=RANDOM_NUMBER,
-                        probability=True,
-                        verbose=False)
+        estimator = SVC(kernel="rbf", random_state=RANDOM_NUMBER, probability=True, verbose=False)
     elif algorithm is Algorithm.LINEAR_REGRESSION:
         estimator = LinearRegression(n_jobs=-1)
     elif algorithm is Algorithm.SVM:
@@ -201,21 +203,40 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
 
     pipeline = Pipeline([("preprocessor", ct), ("model", estimator)])
     # scoring = ['accuracy', 'f1']
-    scoring = 'accuracy'
+    scoring = "accuracy"
     if algorithm is Algorithm.LOGISTIC_REGRESSION or algorithm is Algorithm.DECISION_TREE:
-        search = GridSearchCV(estimator=pipeline, param_grid=grid_values, scoring=scoring,
-                              cv=5, return_train_score=True, verbose=2, n_jobs=-1)
+        search = GridSearchCV(
+            estimator=pipeline,
+            param_grid=grid_values,
+            scoring=scoring,
+            cv=5,
+            return_train_score=True,
+            verbose=2,
+            n_jobs=-1,
+        )
     else:
-        search = RandomizedSearchCV(estimator=pipeline, param_distributions=grid_values, scoring=scoring,
-                                    cv=5, random_state=RANDOM_NUMBER,
-                                    refit="accuracy", verbose=2,
-                                    return_train_score=True, n_iter=50,
-                                    n_jobs=-1)
+        search = RandomizedSearchCV(
+            estimator=pipeline,
+            param_distributions=grid_values,
+            scoring=scoring,
+            cv=5,
+            random_state=RANDOM_NUMBER,
+            refit="accuracy",
+            verbose=2,
+            return_train_score=True,
+            n_iter=50,
+            n_jobs=-1,
+        )
     return search
 
 
-def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list, df_x: pd.DataFrame, df_y: pd.Series)\
-        -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series):
+def get_split(
+    preprocessor: ColumnTransformer,
+    split: Split,
+    cat_features: list,
+    df_x: pd.DataFrame,
+    df_y: pd.Series,
+) -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series):
     """
     Splits the data in train and test data taking the split type (balanced/imbalanced) in
     consideration. Also this function makes sure that the number of features after encoding them
@@ -241,38 +262,58 @@ def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list,
         random_number = None
 
         while not are_sets_equal:
-            X_train, X_test, y_train, y_test, random_number = _get_train_test_split(split, cat_features, df_x, df_y)
+            X_train, X_test, y_train, y_test, random_number = _get_train_test_split(
+                split, cat_features, df_x, df_y
+            )
 
             _ = preprocessor.fit_transform(X_train)
             X_train_ohe_features = set(
-                preprocessor.named_transformers_["cat"].named_steps['onehot'].get_feature_names(cat_features).tolist())
+                preprocessor.named_transformers_["cat"]
+                .named_steps["onehot"]
+                .get_feature_names(cat_features)
+                .tolist()
+            )
             _ = preprocessor.fit_transform(X_test)
             X_test_ohe_features = set(
-                preprocessor.named_transformers_["cat"].named_steps['onehot'].get_feature_names(cat_features).tolist())
-            are_sets_equal = X_train_ohe_features == X_test_ohe_features and\
-                             np.array_equal(sorted(y_train.unique()), sorted(y_test.unique()))
+                preprocessor.named_transformers_["cat"]
+                .named_steps["onehot"]
+                .get_feature_names(cat_features)
+                .tolist()
+            )
+            are_sets_equal = X_train_ohe_features == X_test_ohe_features and np.array_equal(
+                sorted(y_train.unique()), sorted(y_test.unique())
+            )
             if not are_sets_equal:
-                log.debug("Iteration counter: {}\nFeatures difference between train and test split: {}.\n"
-                          "Unique target values for train split: {} and test split: {}".
-                          format(count,
-                                 X_train_ohe_features - X_test_ohe_features
-                                 if len(X_train_ohe_features) > len(X_test_ohe_features)
-                                 else X_test_ohe_features - X_train_ohe_features,
-                                 y_train.unique(),
-                                 y_test.unique()))
+                log.debug(
+                    "Iteration counter: {}\nFeatures difference between train and test split: {}.\n"
+                    "Unique target values for train split: {} and test split: {}".format(
+                        count,
+                        X_train_ohe_features - X_test_ohe_features
+                        if len(X_train_ohe_features) > len(X_test_ohe_features)
+                        else X_test_ohe_features - X_train_ohe_features,
+                        y_train.unique(),
+                        y_test.unique(),
+                    )
+                )
 
             count = count + 1
             if count == iter_limit:
-                raise TimeoutError("No train/test split was found with the same number of encoded features for "
-                                   "both the train and the test split after {} iterations.\n"
-                                   "Features that differ: {}\n".
-                                   format(count, X_train_ohe_features - X_test_ohe_features
-                                 if len(X_train_ohe_features) > len(X_test_ohe_features)
-                                 else X_test_ohe_features - X_train_ohe_features,
-                                 y_train.unique(),
-                                 y_test.unique()))
+                raise TimeoutError(
+                    "No train/test split was found with the same number of encoded features for "
+                    "both the train and the test split after {} iterations.\n"
+                    "Features that differ: {}\n".format(
+                        count,
+                        X_train_ohe_features - X_test_ohe_features
+                        if len(X_train_ohe_features) > len(X_test_ohe_features)
+                        else X_test_ohe_features - X_train_ohe_features,
+                        y_train.unique(),
+                        y_test.unique(),
+                    )
+                )
     else:
-        X_train, X_test, y_train, y_test, random_number = _get_train_test_split(split, cat_features, df_x, df_y)
+        X_train, X_test, y_train, y_test, random_number = _get_train_test_split(
+            split, cat_features, df_x, df_y
+        )
 
     if random_number != RANDOM_NUMBER:
         _set_random_number(random_number=random_number)
@@ -280,8 +321,9 @@ def get_split(preprocessor: ColumnTransformer, split: Split, cat_features: list,
     return X_train, X_test, y_train, y_test
 
 
-def _get_train_test_split(split: Split, cat_features: list, df_X: pd.DataFrame, df_y: pd.Series)\
-        -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, int):
+def _get_train_test_split(
+    split: Split, cat_features: list, df_X: pd.DataFrame, df_y: pd.Series
+) -> (pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, int):
     """
     Splits the data into train and test.
     If we use the imbalanced split option, then the data will not be balanced (down-/upsampled) on
@@ -302,45 +344,69 @@ def _get_train_test_split(split: Split, cat_features: list, df_X: pd.DataFrame, 
 
     if split.type is SplitTypes.BALANCED:
         if not split.value:
-            X_train, X_test, y_train, y_test = train_test_split(df_X,
-                                                                df_y,
-                                                                stratify=df_y,
-                                                                test_size=TEST_SPLIT_SIZE,
-                                                                random_state=random_number)
+            X_train, X_test, y_train, y_test = train_test_split(
+                df_X, df_y, stratify=df_y, test_size=TEST_SPLIT_SIZE, random_state=random_number
+            )
             if cat_features:
                 from imblearn.over_sampling import SMOTENC
-                X_resampled_train, y_resampled_train = \
-                    SMOTENC(categorical_features=sorted([list(df_X.columns).index(f) for f in cat_features]),
-                            random_state=random_number).fit_resample(X_train, y_train)
+
+                X_resampled_train, y_resampled_train = SMOTENC(
+                    categorical_features=sorted(
+                        [list(df_X.columns).index(f) for f in cat_features]
+                    ),
+                    random_state=random_number,
+                ).fit_resample(X_train, y_train)
             else:
                 from imblearn.over_sampling import ADASYN
-                X_resampled_train, y_resampled_train = \
-                    ADASYN(random_state=random_number).fit_resample(X_train, y_train)
+
+                X_resampled_train, y_resampled_train = ADASYN(
+                    random_state=random_number
+                ).fit_resample(X_train, y_train)
             return X_resampled_train, X_test, y_resampled_train, y_test, random_number
         else:
             from functools import reduce
             from xai import balanced_train_test_split
-            max_per_group = int(df_y.size/
-                                (reduce(lambda a, b: a + b,
-                                        list(map(lambda x: len(df_X[x].unique()), cat_features)))*len(df_y.unique())))-1
-            X_train_balanced, y_train_balanced, X_test_balanced, y_test_balanced, train_idx, test_idx =\
-                balanced_train_test_split(
-                    df_X, df_y, *split.value,
-                    min_per_group=int(max_per_group/10),
-                    max_per_group=max_per_group,
-                    categorical_cols=cat_features)
 
-            return X_train_balanced,\
-                   X_test_balanced,\
-                   pd.Series(data=y_train_balanced, name=df_y.name),\
-                   pd.Series(data=y_test_balanced, name=df_y.name),\
-                   random_number
+            max_per_group = (
+                int(
+                    df_y.size
+                    / (
+                        reduce(
+                            lambda a, b: a + b,
+                            list(map(lambda x: len(df_X[x].unique()), cat_features)),
+                        )
+                        * len(df_y.unique())
+                    )
+                )
+                - 1
+            )
+            (
+                X_train_balanced,
+                y_train_balanced,
+                X_test_balanced,
+                y_test_balanced,
+                train_idx,
+                test_idx,
+            ) = balanced_train_test_split(
+                df_X,
+                df_y,
+                *split.value,
+                min_per_group=int(max_per_group / 10),
+                max_per_group=max_per_group,
+                categorical_cols=cat_features,
+            )
+
+            return (
+                X_train_balanced,
+                X_test_balanced,
+                pd.Series(data=y_train_balanced, name=df_y.name),
+                pd.Series(data=y_test_balanced, name=df_y.name),
+                random_number,
+            )
     elif split.type is SplitTypes.NORMAL:
-        X_train, X_test, y_train, y_test = train_test_split(df_X,
-                                                            df_y,
-                                                            stratify=df_y,
-                                                            test_size=TEST_SPLIT_SIZE,
-                                                            random_state=random_number)
+        X_train, X_test, y_train, y_test = train_test_split(
+            df_X, df_y, stratify=df_y, test_size=TEST_SPLIT_SIZE, random_state=random_number
+        )
         return X_train, X_test, y_train, y_test, random_number
     else:
         raise NotImplementedError
@@ -375,8 +441,11 @@ def _set_random_number(random_number: int):
         RANDOM_NUMBER = random_number
         log.info("Value of RANDOM_NUMBER is set to {0}".format(random_number))
     else:
-        log.warning("Trying to change the value of a constant variable RANDOM_NUMBER from {0} to {1}."
-                    .format(RANDOM_NUMBER, random_number))
+        log.warning(
+            "Trying to change the value of a constant variable RANDOM_NUMBER from {0} to {1}.".format(
+                RANDOM_NUMBER, random_number
+            )
+        )
 
 
 def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
@@ -390,9 +459,12 @@ def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
 
     # Get all categorical columns (including the newly encoded with the OHE)
     try:
-        new_ohe_features = preprocessor.named_transformers_["cat"].named_steps['onehot']\
-            .get_feature_names(cat_features)\
+        new_ohe_features = (
+            preprocessor.named_transformers_["cat"]
+            .named_steps["onehot"]
+            .get_feature_names(cat_features)
             .tolist()
+        )
     except NotFittedError:
         log.warning("No categorical features found in this dataset.")
         new_ohe_features = []
@@ -400,8 +472,9 @@ def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
     return new_ohe_features
 
 
-def train_model(model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: pd.Series) -> \
-        (Pipeline, pd.DataFrame, pd.Series):
+def train_model(
+    model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: pd.Series
+) -> (Pipeline, pd.DataFrame, pd.Series):
     """
     Train a model on a dataset.
     :param model_type: The type of model that has to be trained (training algorithm, ...)
@@ -464,9 +537,11 @@ def plot_feature_importance_with_eli5(model: Model) -> (display.HTML, dict):
     """
 
     weights = []
-    explanation = explain_weights(model.model.named_steps["model"],
-                                  feature_names=model.features_ohe,
-                                  top=len(model.features_ohe))
+    explanation = explain_weights(
+        model.model.named_steps["model"],
+        feature_names=model.features_ohe,
+        top=len(model.features_ohe),
+    )
 
     try:
         weights = explanation.targets[0].feature_weights.pos
@@ -479,7 +554,9 @@ def plot_feature_importance_with_eli5(model: Model) -> (display.HTML, dict):
         if weight.weight > 0:
             feature_weight[weight.feature] = weight.weight
 
-    return show_weights(model.model.named_steps["model"], feature_names=model.features_ohe), feature_weight
+    return show_weights(
+        model.model.named_steps["model"], feature_names=model.features_ohe
+    ), feature_weight
 
 
 def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Axes, dict):
@@ -495,10 +572,9 @@ def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Ax
 
     ascending = True
 
-    weights = model.skater_interpreter.feature_importance.feature_importance(model.skater_model,
-                                                                             n_samples=1000,
-                                                                             ascending=ascending,
-                                                                             n_jobs=2)
+    weights = model.skater_interpreter.feature_importance.feature_importance(
+        model.skater_model, n_samples=1000, ascending=ascending, n_jobs=2
+    )
     feature_weight = {}
 
     for i in range(1, len(weights) + 1):
@@ -506,9 +582,9 @@ def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Ax
             feature_weight[list(weights.keys())[i * (-1)]] = weights[i * (-1)]
 
     f, ax = pyplot.subplots(1)
-    colors = cycle(['#328BD5', '#404B5A', '#3EB642', '#E04341', '#8665D0'])
+    colors = cycle(["#328BD5", "#404B5A", "#3EB642", "#E04341", "#8665D0"])
     color = next(colors)
-    weights.sort_values(ascending=ascending).plot(kind='barh', ax=ax, color=color)
+    weights.sort_values(ascending=ascending).plot(kind="barh", ax=ax, color=color)
 
     return f, ax, feature_weight
 
@@ -537,11 +613,8 @@ def plot_feature_importance_with_shap(model: Model, plot_type="bar") -> dict:
 
 
 def calculate_model_rbo(
-        model: Model,
-        d_min: int = 5,
-        d_max: int = None,
-        step: int = 1)\
-        -> pd.DataFrame:
+    model: Model, d_min: int = 5, d_max: int = None, step: int = 1
+) -> pd.DataFrame:
     """
     TODO: Save the FIs for a model in a dict {'ELI5': {'age': 0.15, 'capital-gain': 0.11, ...}, 'SKATER': {...}, ...}
     and create an new function for calculating the RBOs combining this funciton and calculate_feature_importance_rbos()
@@ -567,19 +640,23 @@ def calculate_model_rbo(
     fis = {}
 
     if model.feature_weight_skater and model.feature_weight_shap:
-        if model.model_type.algorithm is Algorithm.SVC or model.model_type.algorithm is Algorithm.XGB:
+        if (
+            model.model_type.algorithm is Algorithm.SVC
+            or model.model_type.algorithm is Algorithm.XGB
+        ):
             fis[FeatureImportanceType.SKATER.name] = model.feature_weight_skater
             fis[FeatureImportanceType.SHAP.name] = model.feature_weight_shap
-            d_max_fi = min(len(model.feature_weight_skater),
-                           len(model.feature_weight_shap))
+            d_max_fi = min(len(model.feature_weight_skater), len(model.feature_weight_shap))
         else:
             if model.feature_weight_eli5:
                 fis[FeatureImportanceType.ELI5.name] = model.feature_weight_eli5
                 fis[FeatureImportanceType.SKATER.name] = model.feature_weight_skater
                 fis[FeatureImportanceType.SHAP.name] = model.feature_weight_shap
-                d_max_fi = min(len(model.feature_weight_eli5),
-                               len(model.feature_weight_skater),
-                               len(model.feature_weight_shap))
+                d_max_fi = min(
+                    len(model.feature_weight_eli5),
+                    len(model.feature_weight_skater),
+                    len(model.feature_weight_shap),
+                )
             else:
                 not_initialized = True
     else:
@@ -592,14 +669,13 @@ def calculate_model_rbo(
         d_max = 0
         log.error(
             "All feature importance techniques should be initialized for model {} before calculating the RBOs for them."
-            " Please execute the generate_feature_importance_plot method for all techniques."
-            .format(model.model_type.algorithm))
+            " Please execute the generate_feature_importance_plot method for all techniques.".format(
+                model.model_type.algorithm
+            )
+        )
 
-    p_d = {round((d-1)/d, 3): d for d in range(d_min, d_max+1, step)}
-    df = pd.DataFrame({
-        'p': list(p_d.keys()),
-        'd': list(p_d.values())
-    })
+    p_d = {round((d - 1) / d, 3): d for d in range(d_min, d_max + 1, step)}
+    df = pd.DataFrame({"p": list(p_d.keys()), "d": list(p_d.values())})
 
     for fi_1_name, fi_2_name in combinations(fis, 2):
         fi_1_value = fis[fi_1_name]
@@ -610,24 +686,23 @@ def calculate_model_rbo(
             if rbo is not None:
                 rbos.append(rbo)
             else:
-                log.debug("Feature importance of type {}, {} or both is/are empty for model: {}."
-                          " Please calculate the feature importance for these models."
-                          .format(fi_1_name, fi_2_name, model.name))
+                log.debug(
+                    "Feature importance of type {}, {} or both is/are empty for model: {}."
+                    " Please calculate the feature importance for these models.".format(
+                        fi_1_name, fi_2_name, model.name
+                    )
+                )
         if rbos:
-            df['{}_{}'.format(fi_1_name, fi_2_name)] = rbos
-    df['Mean'] = round(df.iloc[:, 2:].mean(axis=1), 3)
+            df["{}_{}".format(fi_1_name, fi_2_name)] = rbos
+    df["Mean"] = round(df.iloc[:, 2:].mean(axis=1), 3)
     df.style.highlight_max()
 
     return df
 
 
 def calculate_feature_importance_rbo(
-        type: FeatureImportanceType,
-        models: list,
-        d_min: int = 5,
-        d_max: int = None,
-        step: int = 1)\
-        -> pd.DataFrame:
+    type: FeatureImportanceType, models: list, d_min: int = 5, d_max: int = None, step: int = 1
+) -> pd.DataFrame:
     """
     Calculates the rank-biased overlap (RBO) between all model combinations from the list for a given feature importance
     technique. The persistence (p-value) for the RBO algorithm is calculated (d-1)/d, where d is the depth. The RBO
@@ -656,48 +731,59 @@ def calculate_feature_importance_rbo(
             elif type == FeatureImportanceType.SHAP and model.feature_weight_shap:
                 lengths.append(len(model.feature_weight_shap))
             else:
-                log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+                log.warning(
+                    "Type {} is not yet supported. Please use one of the supported types.".format(
+                        type
+                    )
+                )
 
         d_max = min(lengths)
 
-    p_d = {round((d-1)/d, 3): d for d in range(d_min, d_max+1, step)}
-    df = pd.DataFrame({
-        'p': list(p_d.keys()),
-        'd': list(p_d.values())
-    })
+    p_d = {round((d - 1) / d, 3): d for d in range(d_min, d_max + 1, step)}
+    df = pd.DataFrame({"p": list(p_d.keys()), "d": list(p_d.values())})
     for model_1, model_2 in combinations(models, 2):
         rbos = []
         for p, d in p_d.items():
             rbo = None
             if type == FeatureImportanceType.ELI5:
-                rbo = _calculate_rbo(model_1.feature_weight_eli5, model_2.feature_weight_eli5, d, p, True)
+                rbo = _calculate_rbo(
+                    model_1.feature_weight_eli5, model_2.feature_weight_eli5, d, p, True
+                )
             elif type == FeatureImportanceType.SKATER:
-                rbo = _calculate_rbo(model_1.feature_weight_skater, model_2.feature_weight_skater, d, p, True)
+                rbo = _calculate_rbo(
+                    model_1.feature_weight_skater, model_2.feature_weight_skater, d, p, True
+                )
             elif type == FeatureImportanceType.SHAP:
-                rbo = _calculate_rbo(model_1.feature_weight_shap, model_2.feature_weight_shap, d, p, True)
+                rbo = _calculate_rbo(
+                    model_1.feature_weight_shap, model_2.feature_weight_shap, d, p, True
+                )
             else:
-                log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+                log.warning(
+                    "Type {} is not yet supported. Please use one of the supported types.".format(
+                        type
+                    )
+                )
 
             if rbo is not None:
                 rbos.append(rbo)
             else:
-                log.debug("Feature importance for {}, {} or both is empty for feature importance type: {}."
-                          " Please calculate the feature importance for these models."
-                          .format(model_1.name, model_2.name, type.name))
+                log.debug(
+                    "Feature importance for {}, {} or both is empty for feature importance type: {}."
+                    " Please calculate the feature importance for these models.".format(
+                        model_1.name, model_2.name, type.name
+                    )
+                )
         if rbos:
-            df['{}_{}'.format(model_1.name, model_2.name)] = rbos
-    df['Mean'] = round(df.iloc[:, 2:].mean(axis=1), 3)
+            df["{}_{}".format(model_1.name, model_2.name)] = rbos
+    df["Mean"] = round(df.iloc[:, 2:].mean(axis=1), 3)
     df.style.highlight_max()
 
     return df
 
 
 def calculate_baseline_rbo(
-        d_min: int = 5,
-        d_max: int = None,
-        step: int = 1,
-        num_features: int = 64,
-        num_samples: int = 100) -> pd.DataFrame:
+    d_min: int = 5, d_max: int = None, step: int = 1, num_features: int = 64, num_samples: int = 100
+) -> pd.DataFrame:
     """
     A function to calculate the baseline RBO values for a given minimal depth ("d_min"), maximal depth ("d_max"),
      and "step" for increasing the depth. The persistence of the RBOs is calculated with the following formula:
@@ -713,11 +799,8 @@ def calculate_baseline_rbo(
     :return: A pandas.DataFrame with columns p, d, and Mean.
     """
 
-    p_d = {round((d-1)/d, 3): d for d in range(d_min, d_max+1, step)}
-    df = pd.DataFrame({
-        'p': list(p_d.keys()),
-        'd': list(p_d.values())
-    })
+    p_d = {round((d - 1) / d, 3): d for d in range(d_min, d_max + 1, step)}
+    df = pd.DataFrame({"p": list(p_d.keys()), "d": list(p_d.values())})
 
     import random
     from itertools import combinations
@@ -752,14 +835,16 @@ def calculate_baseline_rbo(
                 rbos[iter] = rbos[iter] + rbo
             iter = iter + 1
 
-    rbos = [rbo/total_combinations for rbo in rbos]
-    df['Mean'] = rbos
+    rbos = [rbo / total_combinations for rbo in rbos]
+    df["Mean"] = rbos
     df.style.highlight_max()
 
     return df
 
 
-def _calculate_rbo(feature_weight_1: dict, feature_weight_2: dict, d: int, p: int, ext: bool = True) -> float:
+def _calculate_rbo(
+    feature_weight_1: dict, feature_weight_2: dict, d: int, p: int, ext: bool = True
+) -> float:
     """
     Calculates a single rank-biased overlap (RBO) value for two models' feature importances.
     :param feature_weight_1: Dictionary containing the FIs for the first model of type {feature name: feature weight}.
@@ -771,13 +856,12 @@ def _calculate_rbo(feature_weight_1: dict, feature_weight_2: dict, d: int, p: in
     If one of the dicts is empty None is returned.
     """
     if feature_weight_1 is not None and feature_weight_2 is not None:
-        rbo = \
-            round(
-                RankingSimilarity(
-                    list(feature_weight_1.keys()),
-                    list(feature_weight_2.keys()))
-                .rbo(k=d, p=p, ext=ext)
-                , 3)
+        rbo = round(
+            RankingSimilarity(list(feature_weight_1.keys()), list(feature_weight_2.keys())).rbo(
+                k=d, p=p, ext=ext
+            ),
+            3,
+        )
     else:
         rbo = None
     return rbo
@@ -790,9 +874,9 @@ def _get_nth_ordinal(n: int) -> str:
     :return: Ordinal representation of the nubmer (e.g., '0th', 3rd', '122nd', '213th')
     """
     n = int(n)
-    suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
+    suffix = ["th", "st", "nd", "rd", "th"][min(n % 10, 4)]
     if 11 <= (n % 100) <= 13:
-        suffix = 'th'
+        suffix = "th"
     return str(n) + suffix
 
 
@@ -807,9 +891,11 @@ def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
     # model.model[0] to get the preprocessor from the pipeline
     X_ohe = model[0].fit_transform(X)
 
-    log.debug("Encoded dataframe shape: {}\n"
-              "Number of all encoded features: {}.".
-              format(X_ohe.shape[1], len(feature_names)))
+    log.debug(
+        "Encoded dataframe shape: {}\nNumber of all encoded features: {}.".format(
+            X_ohe.shape[1], len(feature_names)
+        )
+    )
 
     try:
         X_ohe = X_ohe.toarray()
@@ -829,14 +915,21 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
     is returned, None otherwise
     """
     plot = None
-    log.info("Generating a feature importance plot using {} for {} ...".format(type.name, model.name))
+    log.info(
+        "Generating a feature importance plot using {} for {} ...".format(type.name, model.name)
+    )
 
     start = time.time()
 
     if type == FeatureImportanceType.ELI5:
         # TODO: Support XGB when https://github.com/TeamHG-Memex/eli5/pull/407 fixed.
-        if model.model_type.algorithm is Algorithm.SVC or model.model_type.algorithm is Algorithm.XGB:
-            log.warning("{} is not supported by {}.".format(model.model_type.algorithm.name, type.name))
+        if (
+            model.model_type.algorithm is Algorithm.SVC
+            or model.model_type.algorithm is Algorithm.XGB
+        ):
+            log.warning(
+                "{} is not supported by {}.".format(model.model_type.algorithm.name, type.name)
+            )
         else:
             plot, feature_weight_eli5 = plot_feature_importance_with_eli5(model)
             model.feature_weight_eli5 = feature_weight_eli5
@@ -851,10 +944,14 @@ def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):
         feature_weight_shap = plot_feature_importance_with_shap(model)
         model.feature_weight_shap = feature_weight_shap
     else:
-        log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type.name))
+        log.warning(
+            "Type {} is not yet supported. Please use one of the supported types.".format(type.name)
+        )
 
     end = time.time()
-    _log_elapsed_time(start, end, "generating a feature importance plot with {} is".format(type.name))
+    _log_elapsed_time(
+        start, end, "generating a feature importance plot with {} is".format(type.name)
+    )
 
     return plot
 
@@ -874,7 +971,7 @@ def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str
     start = time.time()
 
     if type == PDPType.PDPBox:
-        if feature2 == 'None':
+        if feature2 == "None":
             fig, ax = plot_single_pdp_with_pdpbox(model, feature1)
         else:
             fig, ax = plot_multi_pdp_with_pdpbox(model, feature1, feature2)
@@ -882,7 +979,7 @@ def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str
     elif type == PDPType.SKATER:
         if not model.skater_model or not model.skater_interpreter:
             model.init_skater()
-        if feature2 == 'None':
+        if feature2 == "None":
             fig, ax = plot_single_pdp_with_skater(model, feature1)
         else:
             fig, ax = plot_multi_pdp_with_skater(model, feature1, feature2)
@@ -890,13 +987,15 @@ def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str
     elif type == PDPType.SHAP:
         if not model.shap_values:
             model.init_shap()
-        if feature2 == 'None':
+        if feature2 == "None":
             fig, ax = plot_single_pdp_with_shap(model, feature1)
         else:
             fig, ax = plot_multi_pdp_with_shap(model, feature1, feature2)
 
     else:
-        log.warning("Type {} is not yet supported. Please use one of the supported types.".format(type))
+        log.warning(
+            "Type {} is not yet supported. Please use one of the supported types.".format(type)
+        )
 
     end = time.time()
     _log_elapsed_time(start, end, "generating a PDP with {} is".format(type.name))
@@ -905,13 +1004,13 @@ def generate_pdp_plots(type: PDPType, model: Model, feature1: str, feature2: str
 
 
 def plot_single_pdp_with_pdpbox(
-        model: Model,
-        feature: str,
-        plot_lines=True,
-        x_quantile=True,
-        show_percentile=True,
-        plot_pts_dist=True,)\
-        -> (figure.Figure, axes.Axes):
+    model: Model,
+    feature: str,
+    plot_lines=True,
+    x_quantile=True,
+    show_percentile=True,
+    plot_pts_dist=True,
+) -> (figure.Figure, axes.Axes):
     """
     Plots a PDP for a single feature for a given model.
     :param model: The model for which a PDP should be created
@@ -928,16 +1027,18 @@ def plot_single_pdp_with_pdpbox(
         model=model.model[1],
         dataset=model.X_test_ohe,
         model_features=model.features_ohe,
-        feature=feature)
+        feature=feature,
+    )
 
     fig, ax = pdp.pdp_plot(
         pdp_isolate_out=pdp_isolate_out,
-        feature_name=feature if isinstance(feature, str) else feature[0].split('_')[0].title,
+        feature_name=feature if isinstance(feature, str) else feature[0].split("_")[0].title,
         plot_lines=plot_lines,
         x_quantile=x_quantile,
         show_percentile=show_percentile,
         plot_pts_dist=plot_pts_dist,
-        frac_to_plot=0.5)
+        frac_to_plot=0.5,
+    )
 
     return fig, ax
 
@@ -955,12 +1056,13 @@ def inverse_scale(model: Model, feature: str, values: list, rounding: int = None
     if feature in model.numerical_features:
         dt = {}
         arr_inv = np.unique(
-            model
-            .model[0]
+            model.model[0]
             .named_transformers_["num"]
-            .named_steps['scale']
-            .inverse_transform(
-                model.X_test_ohe[model.numerical_features])[:, model.numerical_features.index(feature)])
+            .named_steps["scale"]
+            .inverse_transform(model.X_test_ohe[model.numerical_features])[
+                :, model.numerical_features.index(feature)
+            ]
+        )
         arr = np.unique(model.X_test_ohe[feature].array)
         for i in range(len(arr)):
             num = arr[i]
@@ -980,31 +1082,38 @@ def inverse_scale(model: Model, feature: str, values: list, rounding: int = None
             try:
                 res_val = dt[value]
             except KeyError as e:
-                log.debug("An expected error occurred. Program execution may continue: {}".format(e))
+                log.debug(
+                    "An expected error occurred. Program execution may continue: {}".format(e)
+                )
                 res_key, res_val = min(dt.items(), key=lambda x: abs(value - x[0]))
                 # 0.1 is the maximal allowed difference between the input value and the scaled value from the original
-                if abs(res_key-value) >= 0.099:
-                    log.error("No original value corresponds to a scaled value of {} for feature {}.\n"
-                              "All scaled values: original values for {} -> {}."
-                              .format(value, feature, feature, dt))
+                if abs(res_key - value) >= 0.099:
+                    log.error(
+                        "No original value corresponds to a scaled value of {} for feature {}.\n"
+                        "All scaled values: original values for {} -> {}.".format(
+                            value, feature, feature, dt
+                        )
+                    )
                     raise e
             res.append(res_val)
     else:
-        log.error("Feature {} is not a numerical feature; therefore its value cannot be inverse scaled.\n"
-                  "All numerical features are: {}".format(feature, model.numerical_features))
+        log.error(
+            "Feature {} is not a numerical feature; therefore its value cannot be inverse scaled.\n"
+            "All numerical features are: {}".format(feature, model.numerical_features)
+        )
         res = values
 
     return res
 
 
 def plot_multi_pdp_with_pdpbox(
-        model: Model,
-        feature1: str,
-        feature2: str,
-        plot_type='contour',
-        x_quantile=False,
-        plot_pdp=False)\
-        -> (figure.Figure, axes.Axes):
+    model: Model,
+    feature1: str,
+    feature2: str,
+    plot_type="contour",
+    x_quantile=False,
+    plot_pdp=False,
+) -> (figure.Figure, axes.Axes):
     """
     Plots a PDP for two features for a given model.
     :param model: The model for which a PDP should be created
@@ -1022,14 +1131,16 @@ def plot_multi_pdp_with_pdpbox(
         model=model.model[1],
         dataset=model.X_test_ohe,
         model_features=model.features_ohe,
-        features=features_to_plot)
+        features=features_to_plot,
+    )
 
     fig, ax = pdp.pdp_interact_plot(
         pdp_interact_out=pdp_interact_out,
         feature_names=features_to_plot,
         plot_type=plot_type,
         x_quantile=x_quantile,
-        plot_pdp=plot_pdp)
+        plot_pdp=plot_pdp,
+    )
 
     return fig, ax
 
@@ -1049,14 +1160,16 @@ def plot_single_pdp_with_shap(model: Model, feature: str) -> (figure.Figure, axe
         shap_values=model.shap_values[0],
         features=model.X_test_ohe,
         ax=ax,
-        show=False
+        show=False,
         # features=model.X_test_ohe.sample(66, random_state=RANDOM_NUMBER # for testing purposes
     )
 
     return fig, ax
 
 
-def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto') -> (figure.Figure, axes.Axes):
+def plot_multi_pdp_with_shap(
+    model: Model, feature1: str, feature2="auto"
+) -> (figure.Figure, axes.Axes):
     """
     Plots a shap PDP for two features for a given model.
     :param model: The model for which a PDP should be plotted
@@ -1073,7 +1186,7 @@ def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto') -> (f
         shap_values=model.shap_values[0],
         features=model.X_test_ohe,
         ax=ax,
-        show=False
+        show=False,
         # features=model.X_test_ohe.sample(66, random_state=RANDOM_NUMBER # for testing purposes
     )
 
@@ -1081,14 +1194,14 @@ def plot_multi_pdp_with_shap(model: Model, feature1: str, feature2='auto') -> (f
 
 
 def plot_single_pdp_with_skater(
-        model: Model,
-        feature: str,
-        n_samples=1000,
-        grid_resolution=50,
-        grid_range=(0, 1),
-        with_variance=True,
-        figsize=(6, 4))\
-        -> (figure.Figure, axes.Axes):
+    model: Model,
+    feature: str,
+    n_samples=1000,
+    grid_resolution=50,
+    grid_range=(0, 1),
+    with_variance=True,
+    figsize=(6, 4),
+) -> (figure.Figure, axes.Axes):
     """
     Plots a skater PDP for a single feature for a given model.
     :param model: The model for which a PDP should be plotted
@@ -1105,27 +1218,29 @@ def plot_single_pdp_with_skater(
     :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
 
-    r = model.skater_interpreter.partial_dependence.plot_partial_dependence([feature],
-                                                                            model.skater_model,
-                                                                            n_samples=n_samples,
-                                                                            grid_resolution=grid_resolution,
-                                                                            grid_range=grid_range,
-                                                                            with_variance=with_variance,
-                                                                            figsize=figsize)
+    r = model.skater_interpreter.partial_dependence.plot_partial_dependence(
+        [feature],
+        model.skater_model,
+        n_samples=n_samples,
+        grid_resolution=grid_resolution,
+        grid_range=grid_range,
+        with_variance=with_variance,
+        figsize=figsize,
+    )
 
     return r[0][0], r[0][1]
 
 
 def plot_multi_pdp_with_skater(
-        model: Model,
-        feature1: str,
-        feature2: str,
-        n_samples=1000,
-        grid_resolution=100,
-        grid_range=(0, 1),
-        with_variance=False,
-        figsize=(12, 5))\
-        -> (figure.Figure, axes.Axes):
+    model: Model,
+    feature1: str,
+    feature2: str,
+    n_samples=1000,
+    grid_resolution=100,
+    grid_range=(0, 1),
+    with_variance=False,
+    figsize=(12, 5),
+) -> (figure.Figure, axes.Axes):
     """
     Plots a skater PDP for two features for a given model.
     :param model: The model for which a PDP should be plotted
@@ -1143,13 +1258,15 @@ def plot_multi_pdp_with_skater(
     :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
 
-    r = model.skater_interpreter.partial_dependence.plot_partial_dependence([(feature1, feature2)],
-                                                                            model.skater_model,
-                                                                            n_samples=n_samples,
-                                                                            grid_resolution=grid_resolution,
-                                                                            grid_range=grid_range,
-                                                                            with_variance=with_variance,
-                                                                            figsize=figsize)
+    r = model.skater_interpreter.partial_dependence.plot_partial_dependence(
+        [(feature1, feature2)],
+        model.skater_model,
+        n_samples=n_samples,
+        grid_resolution=grid_resolution,
+        grid_range=grid_range,
+        with_variance=with_variance,
+        figsize=figsize,
+    )
     fig = r[0][0]
     ax = r[0][1]
 
@@ -1169,10 +1286,9 @@ def generate_idx2ohe_dict(X: pd.DataFrame, cat_features: list, ohe_cat_features:
     categorical_names = {}
 
     for col in cat_features:
-        categorical_names[X.columns.get_loc(col)] = \
-            [new_col.split("_")[1]
-             for new_col in ohe_cat_features
-             if new_col.split("_")[0] == col]
+        categorical_names[X.columns.get_loc(col)] = [
+            new_col.split("_")[1] for new_col in ohe_cat_features if new_col.split("_")[0] == col
+        ]
 
     return categorical_names.copy()
 
@@ -1194,11 +1310,12 @@ def get_example_information(model: Model, example: int):
 
 
 def explain_single_instance(
-        local_interpreter: LocalInterpreterType,
-        model: Model,
-        example: int,
-        kernel_width: float = None,
-        force: bool = False):
+    local_interpreter: LocalInterpreterType,
+    model: Model,
+    example: int,
+    kernel_width: float = None,
+    force: bool = False,
+):
     """
     Explain single instance (example) with a given interpreter type.
     :param local_interpreter: Type of interpreter to be used. Currently only LIME and SHAP are supported
@@ -1211,61 +1328,88 @@ def explain_single_instance(
     :return: Either a LIME or a SHAP explanation
     """
     explanation = None
-    log.info("Generating a single instance explanation using {} for {} ...".format(local_interpreter.name, model.name))
+    log.info(
+        "Generating a single instance explanation using {} for {} ...".format(
+            local_interpreter.name, model.name
+        )
+    )
 
     start = time.time()
 
-    if local_interpreter is LocalInterpreterType.LIME or local_interpreter is LocalInterpreterType.OPTIMIZED_LIME:
-        if example not in model.example_lime_explainer or (example in model.example_lime_explainer and force):
+    if (
+        local_interpreter is LocalInterpreterType.LIME
+        or local_interpreter is LocalInterpreterType.OPTIMIZED_LIME
+    ):
+        if example not in model.example_lime_explainer or (
+            example in model.example_lime_explainer and force
+        ):
             if local_interpreter is LocalInterpreterType.LIME:
-                log.info("Initializing LIME - generating new explainer for example {} for {} kernel width."
-                         " This operation may be time-consuming so please be patient."
-                         .format(example,
-                                 "the default" if kernel_width is None
-                                 else kernel_width))
+                log.info(
+                    "Initializing LIME - generating new explainer for example {} for {} kernel width."
+                    " This operation may be time-consuming so please be patient.".format(
+                        example, "the default" if kernel_width is None else kernel_width
+                    )
+                )
 
                 model.init_lime(example=example, kernel_width=kernel_width)
                 explanation = explain_single_instance_with_lime(model, example)
             else:
-                log.info("Initializing LIME - generating new explainer for example {} and optimizing the kernel width."
-                         " This operation may be time-consuming so please be patient.".format(example))
+                log.info(
+                    "Initializing LIME - generating new explainer for example {} and optimizing the kernel width."
+                    " This operation may be time-consuming so please be patient.".format(example)
+                )
 
-                def explain_single_instance_with_lime_stability_wrapper(model: Model, example: int, kernel_width: float):
+                def explain_single_instance_with_lime_stability_wrapper(
+                    model: Model, example: int, kernel_width: float
+                ):
                     model.init_lime_stability(example=example, kernel_width=kernel_width)
                     _, csi, vsi = explain_single_instance_with_lime_stability(model, example)
                     return csi, vsi
 
                 from math import sqrt
-                search_space = np.sort(np.append(
-                    sqrt(len(model.X_train.columns)) * 0.75,
-                    np.linspace(0.15, 8.15, num=50, dtype=float)))
+
+                search_space = np.sort(
+                    np.append(
+                        sqrt(len(model.X_train.columns)) * 0.75,
+                        np.linspace(0.15, 8.15, num=50, dtype=float),
+                    )
+                )
                 f = partial(explain_single_instance_with_lime_stability_wrapper, model, example)
-                best_kernel_width, (csi, vsi) = optimize_function(f,
-                                                                  search_space,
-                                                                  num_samples=30,
-                                                                  num_iterations=30,
-                                                                  learning_rate=0.1)
-                log.info("The optimal kernel width for example {} and {} is {}.\n"
-                         "Variables Stability Index (VSI): {}\n"
-                         "Coefficients Stability Index (CSI): {}"
-                         .format(example, model.name, best_kernel_width, csi, vsi))
+                best_kernel_width, (csi, vsi) = optimize_function(
+                    f, search_space, num_samples=30, num_iterations=30, learning_rate=0.1
+                )
+                log.info(
+                    "The optimal kernel width for example {} and {} is {}.\n"
+                    "Variables Stability Index (VSI): {}\n"
+                    "Coefficients Stability Index (CSI): {}".format(
+                        example, model.name, best_kernel_width, csi, vsi
+                    )
+                )
 
                 model.init_lime_stability(example=example, kernel_width=best_kernel_width)
                 explanation, _, _ = explain_single_instance_with_lime_stability(model, example)
 
-            model.feature_value_weight_lime_local = {example: _get_lime_local_feature_value_weight(explanation)}
+            model.feature_value_weight_lime_local = {
+                example: _get_lime_local_feature_value_weight(explanation)
+            }
         elif example in model.example_lime_explainer and not force:
-            log.debug("{} is already initialized for this example {}. "
-                      "Please use the force option if you want to reinitialize it."
-                      .format(local_interpreter.name, example))
+            log.debug(
+                "{} is already initialized for this example {}. "
+                "Please use the force option if you want to reinitialize it.".format(
+                    local_interpreter.name, example
+                )
+            )
             try:
                 # if OPTIMIZED_LIME was used for the initialization
                 explanation, csi, vsi = explain_single_instance_with_lime_stability(model, example)
 
-                log.info("The optimal kernel width for example {} and {} is {}.\n"
-                         "Variables Stability Index (VSI): {}\n"
-                         "Coefficients Stability Index (CSI): {}"
-                         .format(example, model.name, explanation.domain_mapper.kernel_width, csi, vsi))
+                log.info(
+                    "The optimal kernel width for example {} and {} is {}.\n"
+                    "Variables Stability Index (VSI): {}\n"
+                    "Coefficients Stability Index (CSI): {}".format(
+                        example, model.name, explanation.domain_mapper.kernel_width, csi, vsi
+                    )
+                )
             except AttributeError as e:
                 # if LIME was used for the initialization
                 explanation = explain_single_instance_with_lime(model, example)
@@ -1273,13 +1417,21 @@ def explain_single_instance(
         if not model.shap_values:
             model.init_shap()
         explanation = explain_single_instance_with_shap(model, example)
-        model.feature_value_weight_shap_local = {example: _get_shap_local_feature_value_weight(model, explanation)}
+        model.feature_value_weight_shap_local = {
+            example: _get_shap_local_feature_value_weight(model, explanation)
+        }
     else:
-        log.error("Interpreter type {} is not yet supported for local interpretations. Please either use another one"
-                  "or extend the functionality of this function".format(local_interpreter))
+        log.error(
+            "Interpreter type {} is not yet supported for local interpretations. Please either use another one"
+            "or extend the functionality of this function".format(local_interpreter)
+        )
 
     end = time.time()
-    _log_elapsed_time(start, end, "generating a single instance explanation with {} is".format(local_interpreter.name))
+    _log_elapsed_time(
+        start,
+        end,
+        "generating a single instance explanation with {} is".format(local_interpreter.name),
+    )
 
     return explanation
 
@@ -1293,11 +1445,17 @@ def _get_lime_local_feature_value_weight(explanation: Explanation) -> dict:
     """
     feature_value_weight_lime_local = dict(explanation.as_list())
 
-    feature_value_weight_lime_local_pos = dict(filter(lambda x: x[1] >= 0.0, feature_value_weight_lime_local.items()))
-    feature_value_weight_lime_local_neg = dict(filter(lambda x: x[1] < 0.0, feature_value_weight_lime_local.items()))
+    feature_value_weight_lime_local_pos = dict(
+        filter(lambda x: x[1] >= 0.0, feature_value_weight_lime_local.items())
+    )
+    feature_value_weight_lime_local_neg = dict(
+        filter(lambda x: x[1] < 0.0, feature_value_weight_lime_local.items())
+    )
 
-    return {**_sort_dict_by_value(feature_value_weight_lime_local_pos, reverse=True),
-            **_sort_dict_by_value(feature_value_weight_lime_local_neg, reverse=False)}
+    return {
+        **_sort_dict_by_value(feature_value_weight_lime_local_pos, reverse=True),
+        **_sort_dict_by_value(feature_value_weight_lime_local_neg, reverse=False),
+    }
 
 
 def _get_shap_local_feature_value_weight(model: Model, explanation: AdditiveForceVisualizer):
@@ -1310,33 +1468,36 @@ def _get_shap_local_feature_value_weight(model: Model, explanation: AdditiveForc
     """
     feature_value_weight_shap_local_pos = {}
     feature_value_weight_shap_local_neg = {}
-    for key, value in explanation.data['features'].items():
-        feature_name = list(explanation.data['featureNames'])[int(key)]
-        effect = value['effect']
-        value = value['value']
-        new_key = "{} = {} ({})".format(
-                feature_name,
-                int(inverse_scale(model, feature_name, value, 2)[0]),
-                value) \
-            if feature_name in model.numerical_features \
+    for key, value in explanation.data["features"].items():
+        feature_name = list(explanation.data["featureNames"])[int(key)]
+        effect = value["effect"]
+        value = value["value"]
+        new_key = (
+            "{} = {} ({})".format(
+                feature_name, int(inverse_scale(model, feature_name, value, 2)[0]), value
+            )
+            if feature_name in model.numerical_features
             else "{} = {}".format(feature_name, int(value))
+        )
 
         if effect >= 0.0:
             feature_value_weight_shap_local_pos[new_key] = effect
         else:
             feature_value_weight_shap_local_neg[new_key] = effect
 
-    return {**_sort_dict_by_value(feature_value_weight_shap_local_pos, reverse=True),
-            **_sort_dict_by_value(feature_value_weight_shap_local_neg, reverse=False)}
+    return {
+        **_sort_dict_by_value(feature_value_weight_shap_local_pos, reverse=True),
+        **_sort_dict_by_value(feature_value_weight_shap_local_neg, reverse=False),
+    }
 
 
 def optimize_function(
-        f: callable,
-        search_space: np.ndarray,
-        num_samples: int = 10,
-        num_iterations: int = 100,
-        learning_rate: float = 0.01)\
-        -> (float, (float, float)):
+    f: callable,
+    search_space: np.ndarray,
+    num_samples: int = 10,
+    num_iterations: int = 100,
+    learning_rate: float = 0.01,
+) -> (float, (float, float)):
     """
     Optimize a function with one input argument within a given search space using random search and locally refining the
     input by a learning rate.
@@ -1356,8 +1517,9 @@ def optimize_function(
     samples = np.random.choice(search_space, size=num_samples, replace=False)
     for sample in samples:
         output1, output2 = f(sample)
-        if (output1 + output2 > best_output[0] + best_output[1]) or\
-                ((output1 + output2 == best_output[0] + best_output[1]) and sample < best_input):
+        if (output1 + output2 > best_output[0] + best_output[1]) or (
+            (output1 + output2 == best_output[0] + best_output[1]) and sample < best_input
+        ):
             best_input = sample
             best_output = (output1, output2)
 
@@ -1365,17 +1527,19 @@ def optimize_function(
     # Refine the best_input by adding/subtracting the learning_rate to/from the best_input num_iterations/2 times.
     for i in range(2):
         if i == 0:
-            sign = (+1)
+            sign = +1
         else:
-            sign = (-1)
-        for j in range(round(num_iterations/2)):
-            current_learning_rate = j*learning_rate*sign
+            sign = -1
+        for j in range(round(num_iterations / 2)):
+            current_learning_rate = j * learning_rate * sign
             updated_input = best_random_input + current_learning_rate
 
             if updated_input >= search_space[0]:
                 output1, output2 = f(updated_input)
-                if (output1 + output2 > best_output[0] + best_output[1]) or\
-                        ((output1 + output2 == best_output[0] + best_output[1]) and updated_input < best_input):
+                if (output1 + output2 > best_output[0] + best_output[1]) or (
+                    (output1 + output2 == best_output[0] + best_output[1])
+                    and updated_input < best_input
+                ):
                     best_input = updated_input
                     best_output = (output1, output2)
 
@@ -1400,20 +1564,22 @@ def generate_single_instance_comparison(models: list, example: int) -> str:
 
     msg = "Example {} was truly classified by ".format(example)
     if len(classified) > 0:
-        msg = msg + ', '.join(classified)
+        msg = msg + ", ".join(classified)
     else:
         msg = msg + "no model"
 
     msg = msg + " and falsely classified by "
     if len(misclassified) > 0:
-        msg = msg + ', '.join(misclassified)
+        msg = msg + ", ".join(misclassified)
     else:
         msg = msg + "no model"
 
     return msg + ".\n For further clarification see the explanations below.\n"
 
 
-def generate_single_instance_explanation(local_interpreter: LocalInterpreterType, model: Model, example: int) -> str:
+def generate_single_instance_explanation(
+    local_interpreter: LocalInterpreterType, model: Model, example: int
+) -> str:
     """
     Generate an explanation for a single instance (example) for a model with a given interpreter type.
     :param local_interpreter: Interpreter, that should be used
@@ -1425,7 +1591,10 @@ def generate_single_instance_explanation(local_interpreter: LocalInterpreterType
     explanation = ""
     not_initialized = False
 
-    if local_interpreter is LocalInterpreterType.LIME or local_interpreter is LocalInterpreterType.OPTIMIZED_LIME:
+    if (
+        local_interpreter is LocalInterpreterType.LIME
+        or local_interpreter is LocalInterpreterType.OPTIMIZED_LIME
+    ):
         if example in model.example_lime_explainer:
             explanation = generate_single_instance_explanation_with_lime(model, example)
         else:
@@ -1436,14 +1605,22 @@ def generate_single_instance_explanation(local_interpreter: LocalInterpreterType
         else:
             not_initialized = True
     else:
-        log.error("Interpreter type {} is not yet supported for local interpretations. Please either use another one"
-                  "or extend the functionality of this function".format(local_interpreter))
+        log.error(
+            "Interpreter type {} is not yet supported for local interpretations. Please either use another one"
+            "or extend the functionality of this function".format(local_interpreter)
+        )
 
     if not_initialized:
-        log.error("{} is not initialized for example {}. "
-                  "Please initialize {} before trying to generate a textual explanation.\n"
-                  "Note: Use explain_single_instance for initialization of {}"
-                  .format(LocalInterpreterType.name, example, LocalInterpreterType.name, LocalInterpreterType.name))
+        log.error(
+            "{} is not initialized for example {}. "
+            "Please initialize {} before trying to generate a textual explanation.\n"
+            "Note: Use explain_single_instance for initialization of {}".format(
+                LocalInterpreterType.name,
+                example,
+                LocalInterpreterType.name,
+                LocalInterpreterType.name,
+            )
+        )
 
     return explanation
 
@@ -1463,7 +1640,8 @@ def generate_single_instance_explanation_with_lime(model: Model, example: int) -
         dict(filter(lambda x: x[1] >= 0.0, feature_value_weight_lime_local.items())),
         dict(filter(lambda x: x[1] < 0.0, feature_value_weight_lime_local.items())),
         prediction_probability,
-        'LIME')
+        "LIME",
+    )
 
 
 def generate_single_instance_explanation_with_shap(model: Model, example: int) -> str:
@@ -1486,15 +1664,13 @@ def generate_single_instance_explanation_with_shap(model: Model, example: int) -
         dict(filter(lambda x: x[1] >= 0.0, feature_value_weight_shap_local.items())),
         dict(filter(lambda x: x[1] < 0.0, feature_value_weight_shap_local.items())),
         prediction_probability,
-        'SHAP')
+        "SHAP",
+    )
 
 
 def _generate_generic_single_instance_explanation(
-        model_name: str,
-        pos: dict,
-        neg: dict,
-        pred_prob: float,
-        type: str) -> str:
+    model_name: str, pos: dict, neg: dict, pred_prob: float, type: str
+) -> str:
     """
     Generate an explanation message for a given model.
     :param model_name: The name of the model that is going to be explained.
@@ -1505,16 +1681,23 @@ def _generate_generic_single_instance_explanation(
     :return: An explanation message.
     """
 
-    msg = "The prediction probability of {}'s decision for this example is {}. {}'s explanation: \n"\
-        .format(model_name, str(round(pred_prob, 2)), type)
-    msg = msg + _generate_generic_single_instance_explanation_helper(pos, model_name, "positive (1)")
-    msg = msg + _generate_generic_single_instance_explanation_helper(neg, model_name, "negative (0)")
+    msg = "The prediction probability of {}'s decision for this example is {}. {}'s explanation: \n".format(
+        model_name, str(round(pred_prob, 2)), type
+    )
+    msg = msg + _generate_generic_single_instance_explanation_helper(
+        pos, model_name, "positive (1)"
+    )
+    msg = msg + _generate_generic_single_instance_explanation_helper(
+        neg, model_name, "negative (0)"
+    )
     msg = msg + "\n"
 
     return msg
 
 
-def _generate_generic_single_instance_explanation_helper(d: dict, model_name: str, desc: str) -> str:
+def _generate_generic_single_instance_explanation_helper(
+    d: dict, model_name: str, desc: str
+) -> str:
     """
     A helper function for generating an explanation for the single instance explainers.
     :param d: A dictionary containing all features and their values (values determined by an explainer)
@@ -1529,12 +1712,20 @@ def _generate_generic_single_instance_explanation_helper(d: dict, model_name: st
 
     for c in range(len(d)):
         value_rounded = round(values[c], 4)
-        if (c+1) == 1:
-            msg = msg + "The most impactful feature for {}'s {} prediction probability is {} with value of {}.\n"\
-                .format(model_name, desc, keys[c], value_rounded)
+        if (c + 1) == 1:
+            msg = (
+                msg
+                + "The most impactful feature for {}'s {} prediction probability is {} with value of {}.\n".format(
+                    model_name, desc, keys[c], value_rounded
+                )
+            )
         else:
-            msg = msg + "The {} most impactful feature for {}'s {} prediction probability is {} with value of {}.\n"\
-                .format(_get_nth_ordinal(c+1), model_name, desc, keys[c], value_rounded)
+            msg = (
+                msg
+                + "The {} most impactful feature for {}'s {} prediction probability is {} with value of {}.\n".format(
+                    _get_nth_ordinal(c + 1), model_name, desc, keys[c], value_rounded
+                )
+            )
 
     return msg
 
@@ -1552,9 +1743,10 @@ def _strip_dict(d: dict, n: int, reverse: bool) -> dict:
     default_n = 2
 
     if n > len(d):
-        log.error("The length({}) variable should be lower than the length of the dictionary.\n"
-                  "Setting its value to default({})."
-                  .format(n, default_n))
+        log.error(
+            "The length({}) variable should be lower than the length of the dictionary.\n"
+            "Setting its value to default({}).".format(n, default_n)
+        )
         n = default_n
 
     sorted_d = _sort_dict_by_value(d, reverse=reverse)
@@ -1608,14 +1800,10 @@ def convert_to_lime_format(X, categorical_names, col_names=None, invert=False):
 
     for k, v in categorical_names.items():
         if not invert:
-            label_map = {
-                str_label: int_label for int_label, str_label in enumerate(v)
-            }
+            label_map = {str_label: int_label for int_label, str_label in enumerate(v)}
 
         else:
-            label_map = {
-                int_label: str_label for int_label, str_label in enumerate(v)
-            }
+            label_map = {int_label: str_label for int_label, str_label in enumerate(v)}
 
         X_lime.iloc[:, k] = X_lime.iloc[:, k].map(label_map)
 
@@ -1650,7 +1838,8 @@ def _explain_single_instance_with_lime(model: Model, example: int) -> (callable,
         observation,
         custom_model_predict_proba,
         num_samples=15000,
-        num_features=len(model.numerical_features) + len(model.categorical_features))
+        num_features=len(model.numerical_features) + len(model.categorical_features),
+    )
 
     return explanation, custom_model_predict_proba, observation
 
@@ -1676,12 +1865,13 @@ def explain_single_instance_with_lime_stability(model: Model, example: int):
     :return: An explanation object, Variables Stability Index (VSI) and Coefficients Stability Index (CSI) for this
     explanation
     """
-    explanation, custom_model_predict_proba, observation = _explain_single_instance_with_lime(model, example)
+    explanation, custom_model_predict_proba, observation = _explain_single_instance_with_lime(
+        model, example
+    )
 
     csi, vsi = model.example_lime_explainer[example].check_stability(
-        observation,
-        custom_model_predict_proba,
-        num_features=len(model.numerical_features))
+        observation, custom_model_predict_proba, num_features=len(model.numerical_features)
+    )
 
     return explanation, csi, vsi
 
@@ -1698,7 +1888,8 @@ def explain_single_instance_with_shap(model: Model, example: int):
     fp = force_plot(
         model.shap_kernel_explainer.expected_value[prediction],
         model.shap_values[prediction][example, :],
-        model.X_test_ohe.iloc[example, :])
+        model.X_test_ohe.iloc[example, :],
+    )
 
     return fp
 
@@ -1721,17 +1912,23 @@ def get_test_examples(model: Model, examples_type: ExampleType, number_of_exampl
             indexes = choices(model.X_test.index.tolist(), k=number_of_examples)
         else:
             X_output = model.X_test.copy()
-            X_output.loc[:, 'predict'] = model.model.predict(X_output)
-            X_output['result'] = model.y_test.values
+            X_output.loc[:, "predict"] = model.model.predict(X_output)
+            X_output["result"] = model.y_test.values
             if examples_type is ExampleType.TRULY_CLASSIFIED:
-                truly_classified = X_output.loc[(X_output['predict'] == X_output['result'])].index.tolist()
+                truly_classified = X_output.loc[
+                    (X_output["predict"] == X_output["result"])
+                ].index.tolist()
                 indexes = choices(truly_classified, k=number_of_examples)
             elif examples_type is ExampleType.FALSELY_CLASSIFIED:
-                falsely_classified = X_output.loc[(X_output['predict'] != X_output['result'])].index.tolist()
+                falsely_classified = X_output.loc[
+                    (X_output["predict"] != X_output["result"])
+                ].index.tolist()
                 indexes = choices(falsely_classified, k=number_of_examples)
             else:
-                log.error("Example(s) type: {} is not yet supported for this function. Please either use another type"
-                          "or extend the functionality.".format(examples_type.name))
+                log.error(
+                    "Example(s) type: {} is not yet supported for this function. Please either use another type"
+                    "or extend the functionality.".format(examples_type.name)
+                )
     else:
         log.error("The number of examples should be greater than 0: {}".format(number_of_examples))
 
@@ -1750,8 +1947,9 @@ def get_dataset(id: str) -> (Dataset, str):
     :return: A fully loaded dataset, A message for the user
     """
     dataset = Dataset.built_in(id)
-    msg = "Dataset \'{} ({})\' loaded successfully. For further information about this dataset please visit: {}"\
-        .format(dataset.id.name, dataset.name, dataset.url)
+    msg = "Dataset '{} ({})' loaded successfully. For further information about this dataset please visit: {}".format(
+        dataset.id.name, dataset.name, dataset.url
+    )
     log.debug("{}\n{}".format(msg, dataset.df.head()))
 
     return dataset, msg
@@ -1766,8 +1964,9 @@ def get_dataset(name: str, url: str) -> (Dataset, str):
     :return: A fully loaded dataset, A message for the user
     """
     dataset = Dataset.from_url(name, url)
-    msg = "Dataset \'{} ({})\' loaded successfully. For further information about this dataset please visit: {}"\
-        .format(dataset.id.name, dataset.name, dataset.url)
+    msg = "Dataset '{} ({})' loaded successfully. For further information about this dataset please visit: {}".format(
+        dataset.id.name, dataset.name, dataset.url
+    )
     log.debug("{}\n{}".format(msg, dataset.df.head()))
 
     return dataset, msg
@@ -1804,7 +2003,7 @@ def show_target(df: pd.DataFrame, new_value: str):
     msg = ""
     if new_value is not None:
         df_target = df[new_value].head(5)
-        msg = 'Target \'{0}\' value changed successfully.\n{1}'.format(new_value, df_target)
+        msg = "Target '{0}' value changed successfully.\n{1}".format(new_value, df_target)
         log.debug(msg)
     else:
         msg = "No target was selected. Please select a target."
@@ -1829,7 +2028,7 @@ def split_feature_target(df: pd.DataFrame, target: str) -> (pd.DataFrame, pd.Ser
         df_X = df.drop(target, axis=1)
         df_y = df[target]
 
-        msg = 'Target \'{}\' selected successfully.'.format(target)
+        msg = "Target '{}' selected successfully.".format(target)
         log.info(msg)
     else:
         msg = "No target was selected. Please select a target."
@@ -1846,12 +2045,12 @@ def calculate_slider_properties(unique_values: np.ndarray) -> (float, float, flo
     """
     min_val = min(unique_values)
     max_val = max(unique_values)
-    step = (max_val - min_val)/100.0
+    step = (max_val - min_val) / 100.0
 
     return min_val, max_val, 1.0 if step < 1.0 else step
 
 
-def get_stripped_df(df: pd.DataFrame, column, value, eq_value: str = '=') -> pd.DataFrame:
+def get_stripped_df(df: pd.DataFrame, column, value, eq_value: str = "=") -> pd.DataFrame:
     """
     Strips a dataframe based on a value and a sign.
     :param df: The dataframe to be stripped
@@ -1862,11 +2061,11 @@ def get_stripped_df(df: pd.DataFrame, column, value, eq_value: str = '=') -> pd.
     """
 
     df_strip = None
-    if eq_value == '>':
+    if eq_value == ">":
         df_strip = df.loc[df[column] > value]
-    elif eq_value == '=':
+    elif eq_value == "=":
         df_strip = df.loc[df[column] == value]
-    elif eq_value == '<':
+    elif eq_value == "<":
         df_strip = df.loc[df[column] < value]
 
     return df_strip
@@ -1882,7 +2081,9 @@ def remove_model_features(model: Model) -> str:
     df_X_new = model.X.drop(columns=features, axis=1)
     model.X = df_X_new
 
-    msg = 'Features: {} were removed successfully for model {}.\n{}'.format(features, model.name, df_X_new.head(5))
+    msg = "Features: {} were removed successfully for model {}.\n{}".format(
+        features, model.name, df_X_new.head(5)
+    )
     log.info(msg)
     return msg
 
@@ -1902,9 +2103,11 @@ def _ensure_valid_dataset(df: pd.DataFrame):
             columns.append(col)
 
     if len(columns) > 0:
-        raise NotImplementedError("Each column of {} contain more than {} unique values. "
-                                  "Such datasets are currently not supported. "
-                                  "Please preprocess your data and try again.".format(str(columns), upper_bound))
+        raise NotImplementedError(
+            "Each column of {} contain more than {} unique values. "
+            "Such datasets are currently not supported. "
+            "Please preprocess your data and try again.".format(str(columns), upper_bound)
+        )
 
 
 def _log_elapsed_time(start, end, msg):
@@ -1922,7 +2125,11 @@ def _log_elapsed_time(start, end, msg):
     """
     hours, rem = divmod(end - start, 3600)
     minutes, seconds = divmod(rem, 60)
-    log.debug("The elapsed time for {} {:0>2}:{:0>2}:{:05.2f}".format(msg, int(hours), int(minutes), seconds))
+    log.debug(
+        "The elapsed time for {} {:0>2}:{:0>2}:{:05.2f}".format(
+            msg, int(hours), int(minutes), seconds
+        )
+    )
 
 
 def _get_number_of_digits(n: int):
@@ -1932,11 +2139,11 @@ def _get_number_of_digits(n: int):
     :return: The number of digits
     """
     if n > 0:
-        digits = int(math.log10(n))+1
+        digits = int(math.log10(n)) + 1
     elif n == 0:
         digits = 1
     else:
-        digits = int(math.log10(-n))+1
+        digits = int(math.log10(-n)) + 1
 
     return digits
 
@@ -1970,9 +2177,9 @@ def fill_empty_models(df_X: pd.DataFrame, df_y: pd.Series, number_of_models: int
     _ensure_valid_dataset(df_X)
 
     for m in range(number_of_models):
-        models.append(Model(m, "Model " + str(m+1), None, df_X, df_y, _get_model_type(df_y)))
+        models.append(Model(m, "Model " + str(m + 1), None, df_X, df_y, _get_model_type(df_y)))
 
-    msg = "Models to be trained: \'{}\'.".format(number_of_models)
+    msg = "Models to be trained: '{}'.".format(number_of_models)
     log.debug(msg)
     return models, msg
 
@@ -1993,10 +2200,13 @@ def fill_model(model: Model, algorithm=None, split=None) -> str:
     if split:
         model.split = split
     else:
-        model.split = Split(SplitTypes[model.split_type_dd.value], list(model.cross_columns_sm.value))
+        model.split = Split(
+            SplitTypes[model.split_type_dd.value], list(model.cross_columns_sm.value)
+        )
 
-    model_pipeline, X_train, y_train, X_test, y_test = \
-        train_model(model.model_type, model.split, model.X, model.y)
+    model_pipeline, X_train, y_train, X_test, y_test = train_model(
+        model.model_type, model.split, model.X, model.y
+    )
 
     model.model = model_pipeline
     model.X_train = X_train
@@ -2005,7 +2215,9 @@ def fill_model(model: Model, algorithm=None, split=None) -> str:
     model.y_test = y_test
     # required later for global model interpretations
     model.numerical_features, model.categorical_features = _divide_features(X_test)
-    model.categorical_ohe_features = _get_categorical_ohe_features(model_pipeline, model.categorical_features)
+    model.categorical_ohe_features = _get_categorical_ohe_features(
+        model_pipeline, model.categorical_features
+    )
     model.features_ohe = model.numerical_features + model.categorical_ohe_features
     model.idx2ohe = generate_idx2ohe_dict(X_test, model.categorical_features, model.features_ohe)
     model.X_train_ohe = calculate_X_ohe(model_pipeline, X_train, model.features_ohe)
