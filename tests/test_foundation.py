@@ -147,7 +147,7 @@ def test_csv_http(monkeypatch):
 @pytest.mark.xfail(
     strict=True,
     raises=AssertionError,
-    reason="COR-01: preprocessing refitted; docs/correctness-backlog.md",
+    reason="COR-01: explanation transforms refit the preprocessor instead of preserving fitted state",
 )
 def test_regression_transform_does_not_refit(model):
     before = model.model[0].named_transformers_["num"].named_steps["scale"].mean_.copy()
@@ -160,7 +160,7 @@ def test_regression_transform_does_not_refit(model):
 @pytest.mark.xfail(
     strict=True,
     raises=AssertionError,
-    reason="COR-02: prediction differs from argmax; docs/correctness-backlog.md",
+    reason="COR-02: class selection uses probability argmax instead of estimator.predict",
 )
 def test_regression_prediction_class():
     estimator = SimpleNamespace(
@@ -173,7 +173,7 @@ def test_regression_prediction_class():
 @pytest.mark.xfail(
     strict=True,
     raises=AssertionError,
-    reason="COR-03: underscores in categories; docs/correctness-backlog.md",
+    reason="COR-03: splitting encoded names on underscores corrupts feature and category names",
 )
 def test_regression_category_names():
     X = pd.DataFrame({"job_type": ["self_employed", "full_time"]})

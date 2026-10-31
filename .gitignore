@@ -13,6 +13,9 @@ __pycache__/
 # Local backups, downloaded dependencies, and exported experiment results
 .local-backups/
 .local-artifacts/
+/experiments/
+/docs/project-direction-assessment-*.md
+/docs/correctness-backlog.md
 *.log
 
 # OS metadata

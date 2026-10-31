@@ -45,7 +45,9 @@ uv run --no-sync ruff format --check .
 CI runs the offline test suite on Windows and Linux and checks Ruff on Linux.
 Coverage and JUnit reports are generated without an initial coverage threshold.
 The suite includes a notebook smoke fixture, real classifier/explainer calls, and
-three strict expected failures documented in the [correctness backlog](docs/correctness-backlog.md).
+three strict expected failures for preprocessing refitting, predicted-class
+selection, and categorical names containing underscores. Their reasons are
+documented alongside the regression tests.
 Passing tests do not establish that the existing scientific correctness issues are resolved.
 Historical examples still contain expensive searches and network downloads.
 
@@ -87,8 +89,6 @@ _v1.0_
 Example notebooks can be found in [examples](https://github.com/Batev/XAI-Analytics/tree/master). Quick HTML overview of the example notebooks:
 * [Adult Census Income](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/XAI-Example-Income.html)
 * [Risk Factors for Cervical Cancer](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/XAI-Example-Cervical.html)
-
-Local research prototypes are documented separately in [experiments](experiments/README.md), including LIME stability optimization and explanation-ranking comparisons.
 
 ## Known Issues
 
