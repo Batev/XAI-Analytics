@@ -15,7 +15,7 @@ chore/modernize-foundation
 fix/42-preprocessing-refit
 feat/reference-selection
 test/unseen-categories
-ci/windows-linux-checks
+ci/platform-checks
 docs/installation-guide
 ```
 
@@ -70,7 +70,7 @@ Examples:
 ```text
 fix(preprocessing): preserve fitted transformations
 test(lime): cover optimized explanations
-ci: validate Windows and Linux environments
+ci: validate Windows, Linux, and macOS environments
 build!: require Python 3.12
 ```
 
@@ -81,7 +81,7 @@ to help users migrate, even though the upstream specification permits `!` alone.
 ## Validation and merging
 
 Follow README.md for installation and local verification. Required checks are
-Windows tests, Linux tests, and Ruff lint/format checks. Tests include documented
+Windows tests, Linux tests, macOS tests, and Ruff lint/format checks. Tests include documented
 strict expected failures for known scientific defects; a green build does not
 mean those defects have been fixed.
 
@@ -116,7 +116,7 @@ Release checklist:
 1. Prepare a release PR updating the version in `pyproject.toml`, the lockfile and
    generated requirements where necessary, and `CHANGELOG.md`. Include migration
    notes, dependency/platform changes, and known limitations.
-2. Require the Windows/Linux tests and Ruff checks to pass for the release commit.
+2. Require Windows, Linux, and macOS tests and Ruff checks to pass for the release commit.
    Record any applicable manual notebook verification and unresolved limitations.
 3. Merge the release PR and create an annotated `v<version>` tag on that exact
    commit, for example `v3.0.0a1`.

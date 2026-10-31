@@ -15,7 +15,7 @@
 
 - Offline integration tests for classifiers, SHAP, ELI5, standard and optimized
   LIME, CSI/VSI, RBO, dataset parsing, and notebook controls.
-- Windows/Linux continuous integration, Ruff checks, and test/coverage reports.
+- Windows/Linux/macOS continuous integration, Ruff checks, and test/coverage reports.
 - Strict expected-failure regressions documenting known correctness defects.
 - Contribution, Conventional Commit, branch, merge, and release policies.
 

@@ -7,7 +7,7 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
 
 ## Getting started
 
-The supported environment is **Python 3.12 on Windows and Linux**. Install
+The supported environment is **Python 3.12 on Windows, Linux, and macOS**. Install
 [uv](https://docs.astral.sh/uv/getting-started/installation/), clone this repository,
 and run from its root (PowerShell or a Unix shell):
 
@@ -16,6 +16,9 @@ uv python install 3.12
 uv sync --locked --group notebook --group dev
 uv run --no-sync jupyter notebook XAI-Analytics.ipynb
 ```
+
+On macOS, install the OpenMP runtime used by XGBoost with
+`brew install libomp` before launching the notebook or running tests.
 
 uv creates `.venv`; an existing `venv` is preserved. The lockfile is the exact
 development/CI environment. Python 3.7–3.9 and Binder's old environment are no longer
@@ -42,7 +45,7 @@ uv run --no-sync ruff check .
 uv run --no-sync ruff format --check .
 ```
 
-CI runs the offline test suite on Windows and Linux and checks Ruff on Linux.
+CI runs the offline test suite on Windows, Linux, and macOS and checks Ruff on Linux.
 Coverage and JUnit reports are generated without an initial coverage threshold.
 The suite includes a notebook smoke fixture, real classifier/explainer calls, and
 three strict expected failures for preprocessing refitting, predicted-class
