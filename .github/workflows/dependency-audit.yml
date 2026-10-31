@@ -1,0 +1,52 @@
+name: Dependency audit
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: '0.13.6'
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --locked --only-group dev
+      - name: Export the active locked dependency set
+        id: export
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/dependency-audit"
+          uv export --locked --all-groups --no-emit-project --output-file "$RUNNER_TEMP/dependency-audit/requirements.txt"
+      - name: Audit and summarize
+        if: ${{ !cancelled() && steps.export.outcome == 'success' }}
+        shell: bash
+        run: |
+          uv run --no-sync python .github/scripts/audit_dependencies.py \
+            --requirements "$RUNNER_TEMP/dependency-audit/requirements.txt" \
+            --output-dir "$RUNNER_TEMP/dependency-audit" \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: Report setup failure
+        if: ${{ failure() && steps.export.outcome != 'success' }}
+        shell: bash
+        run: |
+          echo '## Dependency audit' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Setup/export failed; no complete audit result is available. Inspect the job logs and rerun.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: dependency-audit
+          path: ${{ runner.temp }}/dependency-audit/
+          if-no-files-found: warn
