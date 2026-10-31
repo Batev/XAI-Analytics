@@ -25,8 +25,14 @@
   SHAP output shapes.
 - Add optional training/search and explanation budgets for small real test runs.
 
+### Fixed
+
+- Preserve fitted imputation, scaling, and category mappings when preparing
+  explanation inputs. Keep encoded row indices and the training feature schema
+  so explanation preparation does not change model predictions.
+
 ### Known limitations
 
-Scientific correctness fixes remain a separate milestone. Known defects are
+Further scientific correctness fixes remain a separate milestone. Known defects are
 documented in the regression tests. This development series is not a stable
 release; the existing v1/v2 tags remain historical releases.

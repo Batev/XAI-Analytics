@@ -48,9 +48,8 @@ uv run --no-sync ruff format --check .
 CI runs the offline test suite on Windows, Linux, and macOS and checks Ruff on Linux.
 Coverage and JUnit reports are generated without an initial coverage threshold.
 The suite includes a notebook smoke fixture, real classifier/explainer calls, and
-three strict expected failures for preprocessing refitting, predicted-class
-selection, and categorical names containing underscores. Their reasons are
-documented alongside the regression tests.
+two strict expected failures for predicted-class selection and categorical names
+containing underscores. Each reason is documented alongside its regression test.
 Passing tests do not establish that the existing scientific correctness issues are resolved.
 Historical examples still contain expensive searches and network downloads.
 
