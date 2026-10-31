@@ -1,22 +1,23 @@
 import logging as log
 
 from ipywidgets import (
-    Widget,
-    Layout,
-    ButtonStyle,
-    Label,
-    GridBox,
     Button,
-    HBox,
-    RadioButtons,
-    IntSlider,
+    ButtonStyle,
     Dropdown,
+    GridBox,
+    HBox,
+    IntSlider,
+    Label,
+    Layout,
+    RadioButtons,
     Select,
     SelectMultiple,
+    Widget,
 )
-from util.commons import FeatureImportanceType, PDPType, LocalInterpreterType, ExampleType
-from util.split import SplitTypes
+
+from util.commons import ExampleType, FeatureImportanceType, LocalInterpreterType, PDPType
 from util.model import Model
+from util.split import SplitTypes
 
 
 def generate_analyze_grid(
@@ -206,7 +207,7 @@ def generate_model_grid(
             options=model.X,
             rows=8 if len_df_X_columns <= 20 else 20,
             layout=Layout(width="auto", height="auto"),
-            description="",
+            description="Unavailable",
             disabled=True,
             description_tooltip="One or more positional arguments (passed as *args) "
             "that are used to split the data into the cross product "
@@ -335,7 +336,9 @@ def generate_feature_importance_grid(models: list) -> GridBox:
     children.append(
         Select(
             description="Type",
-            options=[elem.name for elem in FeatureImportanceType],
+            options=[
+                elem.name for elem in FeatureImportanceType if elem != FeatureImportanceType.SKATER
+            ],
             disabled=False,
         )
     )
@@ -363,7 +366,12 @@ def generate_pdp_grid(models: list) -> GridBox:
     children = []
 
     # Row 1
-    children.append(Label(layout=Layout(width="auto", height="auto"), value="Choose a PDP method"))
+    children.append(
+        Label(
+            layout=Layout(width="auto", height="auto"),
+            value="Choose a SHAP dependence plot (legacy PDP integrations unavailable)",
+        )
+    )
     children.append(
         Label(layout=Layout(width="auto", height="auto"), value="Choose one or more model(s)")
     )
@@ -371,9 +379,7 @@ def generate_pdp_grid(models: list) -> GridBox:
     # Row 2
     # if you change the description of this widget,
     # you have to also adjust it in the notebook function call.
-    children.append(
-        Select(description="Type", options=[elem.name for elem in PDPType], disabled=False)
-    )
+    children.append(Select(description="Type", options=[PDPType.SHAP.name], disabled=False))
     # if you change the description of this widget,
     # you have to also adjust it in the notebook function call.
     children.append(
@@ -539,7 +545,7 @@ def get_model_by_remove_features_button(models: list, button: Widget) -> Model:
         if m.remove_features_button is button:
             model = m
     if model is None:
-        log.error("No model found with ID ''.".format(id))
+        log.error("No model found with ID ''.")
         return model
     else:
         return model
@@ -551,7 +557,7 @@ def get_model_by_train_model_button(models: list, button: Widget) -> Model:
         if m.train_model_button is button:
             model = m
     if model is None:
-        log.error("No model found with ID ''.".format(id))
+        log.error("No model found with ID ''.")
         return model
     else:
         return model
@@ -563,7 +569,7 @@ def get_model_by_split_type_dd(models: list, dropdown: Widget) -> Model:
         if m.split_type_dd is dropdown:
             model = m
     if model is None:
-        log.error("No model found with ID ''.".format(id))
+        log.error("No model found with ID ''.")
         return model
     else:
         return model

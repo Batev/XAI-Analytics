@@ -1,45 +1,46 @@
-import pandas as pd
-import numpy as np
-import logging as log
 import enum
-import time
+import logging as log
 import math
-
+import time
 from functools import partial
 from random import choices, randrange
-from matplotlib import figure, axes, font_manager, pyplot as plt
+
+import numpy as np
+import pandas as pd
+from eli5 import explain_weights, show_weights
 from IPython import display
-from eli5 import show_weights, explain_weights
-from shap import summary_plot, dependence_plot, force_plot
-from shap.plots._force import AdditiveForceVisualizer
 from lime.explanation import Explanation
+from matplotlib import axes, figure
+from matplotlib import pyplot as plt
+from multipledispatch import dispatch
+from pandas.api.types import is_numeric_dtype, is_string_dtype
+from rbo import RankingSimilarity
+from shap import dependence_plot, force_plot, summary_plot
+from shap.plots._force import AdditiveForceVisualizer
 from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import train_test_split, GridSearchCV, RandomizedSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.exceptions import NotFittedError
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    RocCurveDisplay,
     accuracy_score,
     classification_report,
-    r2_score,
     mean_squared_error,
-    plot_confusion_matrix,
-    plot_roc_curve,
+    r2_score,
 )
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.exceptions import NotFittedError
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 from xgboost import XGBClassifier
-from pandas.api.types import is_numeric_dtype, is_string_dtype
-from multipledispatch import dispatch
-from rbo import RankingSimilarity
-from pdpbox import pdp
-from util.dataset import Datasets, Dataset
+
+from util.dataset import Dataset
+from util.legacy import unavailable
 from util.model import Algorithm, Model, ModelType, ProblemType
 from util.split import Split, SplitTypes
-
 
 RANDOM_NUMBER = None
 TEST_SPLIT_SIZE = 0.3
@@ -126,7 +127,16 @@ def get_column_transformer(numerical: list, categorical: list) -> ColumnTransfor
     )
 
 
-def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) -> GridSearchCV:
+def get_pipeline(
+    ct: ColumnTransformer,
+    algorithm: Algorithm,
+    data_size: int,
+    *,
+    param_grid=None,
+    cv=5,
+    n_jobs=-1,
+    n_iter=50,
+) -> GridSearchCV:
     """
     Returns a new pipeline depending on the chosen algorithm.
     :param ct: A column transformer used in the pipeline
@@ -149,12 +159,12 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
             {
                 "model__solver": ["saga"],
                 "model__C": np.logspace(-4, 4, 9),
-                "model__penalty": ["l1", "l2", "elasticnet", "none"],
+                "model__penalty": ["l1", "l2", None],
             },
             {
                 "model__solver": ["newton-cg", "lbfgs", "sag"],
                 "model__C": np.logspace(-4, 4, 9),
-                "model__penalty": ["l2", "none"],
+                "model__penalty": ["l2", None],
             },
         ]
     elif algorithm is Algorithm.DECISION_TREE:
@@ -164,7 +174,7 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
                 "model__criterion": ["gini", "entropy"],
                 "model__splitter": ["best", "random"],
                 "model__max_depth": np.linspace(2, 64, num=20, dtype=int),
-                "model__max_features": ["auto", "sqrt", "log2", 0.25, 0.5, 0.75, 1.0, None],
+                "model__max_features": ["sqrt", "log2", 0.25, 0.5, 0.75, 1.0, None],
             }
         ]
     elif algorithm is Algorithm.RANDOM_FOREST:
@@ -201,6 +211,8 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
     else:
         raise NotImplementedError
 
+    if param_grid is not None:
+        grid_values = param_grid
     pipeline = Pipeline([("preprocessor", ct), ("model", estimator)])
     # scoring = ['accuracy', 'f1']
     scoring = "accuracy"
@@ -209,23 +221,23 @@ def get_pipeline(ct: ColumnTransformer, algorithm: Algorithm, data_size: int) ->
             estimator=pipeline,
             param_grid=grid_values,
             scoring=scoring,
-            cv=5,
+            cv=cv,
             return_train_score=True,
             verbose=2,
-            n_jobs=-1,
+            n_jobs=n_jobs,
         )
     else:
         search = RandomizedSearchCV(
             estimator=pipeline,
             param_distributions=grid_values,
             scoring=scoring,
-            cv=5,
+            cv=cv,
             random_state=RANDOM_NUMBER,
             refit="accuracy",
             verbose=2,
             return_train_score=True,
-            n_iter=50,
-            n_jobs=-1,
+            n_iter=n_iter,
+            n_jobs=n_jobs,
         )
     return search
 
@@ -270,14 +282,14 @@ def get_split(
             X_train_ohe_features = set(
                 preprocessor.named_transformers_["cat"]
                 .named_steps["onehot"]
-                .get_feature_names(cat_features)
+                .get_feature_names_out(cat_features)
                 .tolist()
             )
             _ = preprocessor.fit_transform(X_test)
             X_test_ohe_features = set(
                 preprocessor.named_transformers_["cat"]
                 .named_steps["onehot"]
-                .get_feature_names(cat_features)
+                .get_feature_names_out(cat_features)
                 .tolist()
             )
             are_sets_equal = X_train_ohe_features == X_test_ohe_features and np.array_equal(
@@ -306,8 +318,6 @@ def get_split(
                         X_train_ohe_features - X_test_ohe_features
                         if len(X_train_ohe_features) > len(X_test_ohe_features)
                         else X_test_ohe_features - X_train_ohe_features,
-                        y_train.unique(),
-                        y_test.unique(),
                     )
                 )
     else:
@@ -365,6 +375,8 @@ def _get_train_test_split(
             return X_resampled_train, X_test, y_resampled_train, y_test, random_number
         else:
             from functools import reduce
+
+            unavailable("xai demographic balancing")
             from xai import balanced_train_test_split
 
             max_per_group = (
@@ -462,7 +474,7 @@ def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
         new_ohe_features = (
             preprocessor.named_transformers_["cat"]
             .named_steps["onehot"]
-            .get_feature_names(cat_features)
+            .get_feature_names_out(cat_features)
             .tolist()
         )
     except NotFittedError:
@@ -473,7 +485,7 @@ def _get_categorical_ohe_features(model: Pipeline, cat_features: list) -> list:
 
 
 def train_model(
-    model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: pd.Series
+    model_type: ModelType, split: Split, df_x: pd.DataFrame, df_y: pd.Series, *, search_options=None
 ) -> (Pipeline, pd.DataFrame, pd.Series):
     """
     Train a model on a dataset.
@@ -494,7 +506,9 @@ def train_model(
     preprocessor = get_column_transformer(num_features, cat_features)
 
     X_train, X_test, y_train, y_test = get_split(preprocessor, split, cat_features, df_x, df_y)
-    model = get_pipeline(preprocessor, model_type.algorithm, int(df_y.size))
+    model = get_pipeline(
+        preprocessor, model_type.algorithm, int(df_y.size), **(search_options or {})
+    )
 
     start = time.time()
     # Now we can fit the model on the whole training set and calculate accuracy on the test set.
@@ -516,15 +530,15 @@ def train_model(
         fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(14, 5))
         ax1.set_title("Confusion Matrix")
         ax2.set_title("ROC Curve")
-        plot_confusion_matrix(model, X_test, y_test, ax=ax1)
-        plot_roc_curve(model, X_test, y_test, ax=ax2)
+        ConfusionMatrixDisplay.from_estimator(model, X_test, y_test, ax=ax1)
+        RocCurveDisplay.from_estimator(model, X_test, y_test, ax=ax2)
         fig.tight_layout()
         plt.show()
     # regression
     elif model_type.problem_type == ProblemType.REGRESSION:
         log.info("R2 score : %.2f" % r2_score(y_test, y_pred))
         log.info("Mean squared error: %.2f" % mean_squared_error(y_test, y_pred))
-        log.info("RMSE number:  %.2f" % pd.np.sqrt(mean_squared_error(y_test, y_pred)))
+        log.info("RMSE number:  %.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
 
     return model, X_train, y_train, X_test, y_test
 
@@ -566,9 +580,11 @@ def plot_feature_importance_with_skater(model: Model) -> (figure.Figure, axes.Ax
     :return: (f, ax, feature_weight): (figure instance, matplotlib.axes._subplots.AxesSubplot,
     feature importance in a dictionary format)
     """
+    unavailable("Skater")
+
+    from itertools import cycle
 
     from matplotlib import pyplot
-    from itertools import cycle
 
     ascending = True
 
@@ -1021,6 +1037,8 @@ def plot_single_pdp_with_pdpbox(
     :param plot_pts_dist: Whether to show data points distribution
     :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
+    unavailable("PDPbox")
+    from pdpbox import pdp
 
     # model.model[1] to get the actual model from the pipeline
     pdp_isolate_out = pdp.pdp_isolate(
@@ -1124,6 +1142,9 @@ def plot_multi_pdp_with_pdpbox(
     :param plot_pdp: Whether to plot pdp for each feature
     :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
+    unavailable("PDPbox")
+    from pdpbox import pdp
+
     features_to_plot = [feature1, feature2]
 
     # model.model[1] to get the actual model from the pipeline
@@ -1217,6 +1238,7 @@ def plot_single_pdp_with_skater(
     :param figsize: Whether to include pdp error bars in the plots. Currently disabled for 3D plots for visibility.
     :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
+    unavailable("Skater")
 
     r = model.skater_interpreter.partial_dependence.plot_partial_dependence(
         [feature],
@@ -1257,6 +1279,7 @@ def plot_multi_pdp_with_skater(
     :param figsize: Whether to include pdp error bars in the plots. Currently disabled for 3D plots for visibility.
     :return: (fig, ax): A matplotlib tuple consisting of a figure object and an ax object
     """
+    unavailable("Skater")
 
     r = model.skater_interpreter.partial_dependence.plot_partial_dependence(
         [(feature1, feature2)],
@@ -1315,6 +1338,12 @@ def explain_single_instance(
     example: int,
     kernel_width: float = None,
     force: bool = False,
+    *,
+    num_samples=15000,
+    stability_samples=5000,
+    stability_calls=10,
+    optimization_samples=30,
+    optimization_iterations=30,
 ):
     """
     Explain single instance (example) with a given interpreter type.
@@ -1352,7 +1381,9 @@ def explain_single_instance(
                 )
 
                 model.init_lime(example=example, kernel_width=kernel_width)
-                explanation = explain_single_instance_with_lime(model, example)
+                explanation = explain_single_instance_with_lime(
+                    model, example, num_samples=num_samples
+                )
             else:
                 log.info(
                     "Initializing LIME - generating new explainer for example {} and optimizing the kernel width."
@@ -1363,7 +1394,13 @@ def explain_single_instance(
                     model: Model, example: int, kernel_width: float
                 ):
                     model.init_lime_stability(example=example, kernel_width=kernel_width)
-                    _, csi, vsi = explain_single_instance_with_lime_stability(model, example)
+                    _, csi, vsi = explain_single_instance_with_lime_stability(
+                        model,
+                        example,
+                        num_samples=num_samples,
+                        stability_samples=stability_samples,
+                        stability_calls=stability_calls,
+                    )
                     return csi, vsi
 
                 from math import sqrt
@@ -1376,7 +1413,11 @@ def explain_single_instance(
                 )
                 f = partial(explain_single_instance_with_lime_stability_wrapper, model, example)
                 best_kernel_width, (csi, vsi) = optimize_function(
-                    f, search_space, num_samples=30, num_iterations=30, learning_rate=0.1
+                    f,
+                    search_space,
+                    num_samples=optimization_samples,
+                    num_iterations=optimization_iterations,
+                    learning_rate=0.1,
                 )
                 log.info(
                     "The optimal kernel width for example {} and {} is {}.\n"
@@ -1386,8 +1427,15 @@ def explain_single_instance(
                     )
                 )
 
+                model.optimized_kernel_width = best_kernel_width
                 model.init_lime_stability(example=example, kernel_width=best_kernel_width)
-                explanation, _, _ = explain_single_instance_with_lime_stability(model, example)
+                explanation, _, _ = explain_single_instance_with_lime_stability(
+                    model,
+                    example,
+                    num_samples=num_samples,
+                    stability_samples=stability_samples,
+                    stability_calls=stability_calls,
+                )
 
             model.feature_value_weight_lime_local = {
                 example: _get_lime_local_feature_value_weight(explanation)
@@ -1401,7 +1449,13 @@ def explain_single_instance(
             )
             try:
                 # if OPTIMIZED_LIME was used for the initialization
-                explanation, csi, vsi = explain_single_instance_with_lime_stability(model, example)
+                explanation, csi, vsi = explain_single_instance_with_lime_stability(
+                    model,
+                    example,
+                    num_samples=num_samples,
+                    stability_samples=stability_samples,
+                    stability_calls=stability_calls,
+                )
 
                 log.info(
                     "The optimal kernel width for example {} and {} is {}.\n"
@@ -1410,9 +1464,11 @@ def explain_single_instance(
                         example, model.name, explanation.domain_mapper.kernel_width, csi, vsi
                     )
                 )
-            except AttributeError as e:
+            except AttributeError:
                 # if LIME was used for the initialization
-                explanation = explain_single_instance_with_lime(model, example)
+                explanation = explain_single_instance_with_lime(
+                    model, example, num_samples=num_samples
+                )
     elif local_interpreter is LocalInterpreterType.SHAP:
         if not model.shap_values:
             model.init_shap()
@@ -1810,7 +1866,9 @@ def convert_to_lime_format(X, categorical_names, col_names=None, invert=False):
     return X_lime
 
 
-def _explain_single_instance_with_lime(model: Model, example: int) -> (callable, Model, int):
+def _explain_single_instance_with_lime(
+    model: Model, example: int, *, num_samples=15000
+) -> (callable, Model, int):
     """
     This function explains the classification result of a single instance using LIME. It returns an explanation object,
      a custom predict_proba function that could be used in lime, and the observation that was explained.
@@ -1837,26 +1895,28 @@ def _explain_single_instance_with_lime(model: Model, example: int) -> (callable,
     explanation = model.example_lime_explainer[example].explain_instance(
         observation,
         custom_model_predict_proba,
-        num_samples=15000,
+        num_samples=num_samples,
         num_features=len(model.numerical_features) + len(model.categorical_features),
     )
 
     return explanation, custom_model_predict_proba, observation
 
 
-def explain_single_instance_with_lime(model: Model, example: int):
+def explain_single_instance_with_lime(model: Model, example: int, *, num_samples=15000):
     """
     Explain single instance with LIME from the test dataset.
     :param model: Model, which should be explained
     :param example: Position of the example from the test dataset, that has to be explained
     :return: An explanation object
     """
-    explanation, _, _ = _explain_single_instance_with_lime(model, example)
+    explanation, _, _ = _explain_single_instance_with_lime(model, example, num_samples=num_samples)
 
     return explanation
 
 
-def explain_single_instance_with_lime_stability(model: Model, example: int):
+def explain_single_instance_with_lime_stability(
+    model: Model, example: int, *, num_samples=15000, stability_samples=5000, stability_calls=10
+):
     """
     Explain single instance with LIME from the test dataset and calculate the Variables Stability Index (VSI) and
     Coefficients Stability Index (CSI) for this explanation.
@@ -1866,11 +1926,15 @@ def explain_single_instance_with_lime_stability(model: Model, example: int):
     explanation
     """
     explanation, custom_model_predict_proba, observation = _explain_single_instance_with_lime(
-        model, example
+        model, example, num_samples=num_samples
     )
 
     csi, vsi = model.example_lime_explainer[example].check_stability(
-        observation, custom_model_predict_proba, num_features=len(model.numerical_features)
+        observation,
+        custom_model_predict_proba,
+        num_features=len(model.numerical_features),
+        num_samples=stability_samples,
+        n_calls=stability_calls,
     )
 
     return explanation, csi, vsi
@@ -1956,7 +2020,7 @@ def get_dataset(id: str) -> (Dataset, str):
 
 
 @dispatch(str, str)
-def get_dataset(name: str, url: str) -> (Dataset, str):
+def get_dataset(name: str, url: str) -> (Dataset, str):  # noqa: F811 - multipledispatch overload
     """
     Get a dataset from an URL (external source).
     :param name: The name of the dataset.
@@ -1981,8 +2045,8 @@ def change_cross_columns_status(model: Model, new_value: str) -> str:
     """
     msg = "Cross columns status was successfully changed to "
     if new_value == SplitTypes.BALANCED.name:
-        model.cross_columns_sm.disabled = False
-        msg = msg + "enabled."
+        model.cross_columns_sm.disabled = True
+        msg = msg + "disabled (xai demographic balancing unavailable)."
     elif new_value == SplitTypes.NORMAL.name:
         model.cross_columns_sm.disabled = True
         msg = msg + "disabled."
@@ -2184,7 +2248,7 @@ def fill_empty_models(df_X: pd.DataFrame, df_y: pd.Series, number_of_models: int
     return models, msg
 
 
-def fill_model(model: Model, algorithm=None, split=None) -> str:
+def fill_model(model: Model, algorithm=None, split=None, *, search_options=None) -> str:
     """
     A model is trained based on the properties selected by the user.
     :param model: The model to be filled - trained and then saved.
@@ -2205,7 +2269,7 @@ def fill_model(model: Model, algorithm=None, split=None) -> str:
         )
 
     model_pipeline, X_train, y_train, X_test, y_test = train_model(
-        model.model_type, model.split, model.X, model.y
+        model.model_type, model.split, model.X, model.y, search_options=search_options
     )
 
     model.model = model_pipeline

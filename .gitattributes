@@ -1,2 +1,3 @@
 # Preserve archived research bytes so provenance hashes survive every checkout.
 experiments/** -text
+docs/legacy-environment/** -text

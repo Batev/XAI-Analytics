@@ -1,12 +1,11 @@
 import enum
-import zipfile
-import pandas as pd
 import logging as log
-
-from statsmodels.api import datasets
+import zipfile
 from io import StringIO
-from urllib.request import urlopen
 from shutil import copyfileobj
+from urllib.request import urlopen
+
+import pandas as pd
 
 
 class Datasets(enum.Enum):
@@ -200,6 +199,12 @@ class Dataset:
             cmd = "datasets.{}.load_pandas().data".format(id.name)
             return eval(cmd)
         elif id.value == 27:
+            from util.legacy import unavailable
+
+            unavailable("xai Census loader")
+            from util.legacy import unavailable
+
+            unavailable("xai Census loader")
             from xai.data import load_census
 
             return load_census()

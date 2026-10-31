@@ -1,7 +1,7 @@
 import enum
-import pandas as pd
 import logging as log
 
+import pandas as pd
 from sklearn.pipeline import Pipeline
 
 
@@ -235,7 +235,7 @@ class Model:
     def shap_kernel_explainer(self, new_value):
         self._shap_kernel_explainer = new_value
 
-    def init_shap(self):
+    def init_shap(self, *, nsamples="auto"):
         """
         Initialize shap. Calculate shap values. This operation is time-consuming.
         :return: void (Sets the value of the shap_values variable)
@@ -254,11 +254,14 @@ class Model:
             shap_kernel_explainer = shap.KernelExplainer(
                 self.model[1].predict_proba, shap.kmeans(self.X_test_ohe, 1), n_jobs=-1
             )
-            shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe)
+            shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe, nsamples=nsamples)
             # from util.commons import RANDOM_NUMBER
             # shap_values = shap_kernel_explainer.shap_values(self.X_test_ohe.sample(66, random_state=RANDOM_NUMBER))
 
             self.shap_kernel_explainer = shap_kernel_explainer
+            # SHAP >=0.45 returns (rows, features, outputs), formerly a list.
+            if not isinstance(shap_values, list):
+                shap_values = [shap_values[:, :, i] for i in range(shap_values.shape[2])]
             self.shap_values = shap_values
         else:
             log.info("Shap is already initialized.")
@@ -284,6 +287,9 @@ class Model:
         Initialize skater. Set ups skater interpreter and in-memory model.
         :return: void (Sets the values of the skater_interpreter and skater_model variables)
         """
+        from util.legacy import unavailable
+
+        unavailable("Skater")
         from skater.core.explanations import Interpretation
         from skater.model import InMemoryModel
 
@@ -318,6 +324,7 @@ class Model:
         :return: void (Sets the value of example_lime_explainer for this example)
         """
         from lime.lime_tabular import LimeTabularExplainer
+
         from util.commons import RANDOM_NUMBER, convert_to_lime_format
 
         # Transform the categorical feature's labels to a lime-readable format.
@@ -347,6 +354,7 @@ class Model:
         :return: void (Sets the value of example_lime_explainer for this example)
         """
         from lime_stability.stability import LimeTabularExplainerOvr
+
         from util.commons import RANDOM_NUMBER, convert_to_lime_format
 
         # Transform the categorical feature's labels to a lime-readable format.
