@@ -102,6 +102,30 @@ branch after merging. Rebase personal branches when necessary; coordinate before
 rewriting a shared branch and use `--force-with-lease` for an intentional update.
 Preserve default-branch and published release history.
 
+## Optional local checks
+
+Install the locked development environment using the README commands, then opt
+in to Git hooks with:
+
+```sh
+uv run --no-sync pre-commit install
+```
+
+To run checks without installing a hook:
+
+```sh
+uv run --no-sync pre-commit run --files util/model.py README.md
+```
+
+Local Ruff hooks use the same locked version, file coverage, and check-only
+behavior as CI. Whitespace/final-newline hooks cover source, configuration, and
+Markdown, preserving Markdown hard breaks; they may repair selected files.
+Notebooks, HTML exports, datasets, and generated requirements are excluded.
+Review any repairs before committing. Keep broad mechanical cleanup in its own
+commit. The full scientific suite remains in CI and the documented verification
+commands; it is not run on every commit. Hooks are optional, and can be removed
+with `uv run --no-sync pre-commit uninstall`.
+
 ## Versioning and releases
 
 Use semantic versioning with Python-compatible development and prerelease forms:

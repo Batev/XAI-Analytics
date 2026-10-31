@@ -1,0 +1,37 @@
+name: Bug report
+description: Report a reproducible problem with the supported environment or workflow.
+title: 'bug: '
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, Python version, uv version, and the project commit or branch.
+      placeholder: Windows 11; Python 3.12; uv version; commit hash
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide commands or notebook steps and a small local or synthetic dataset if needed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and error output
+      description: Include the traceback or relevant output.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Installation and verification
+      description: State which README setup commands you ran and whether uv pip check and the relevant tests pass.
