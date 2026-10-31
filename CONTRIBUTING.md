@@ -99,6 +99,9 @@ Preserve default-branch and published release history.
 
 ## Versioning and releases
 
+See [Dependency maintenance](docs/dependency-maintenance.md) for the hosted update
+service, generated pip export, and intentional package upgrades.
+
 Use semantic versioning with Python-compatible development and prerelease forms:
 
 - Patch: compatible bug fixes, such as `3.0.1`.

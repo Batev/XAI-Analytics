@@ -1,0 +1,42 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "enabledManagers": ["pep621", "github-actions"],
+  "ignorePaths": ["docs/legacy-environment/**"],
+  "timezone": "Europe/Sofia",
+  "schedule": ["* 0-9 * * 1"],
+  "prConcurrentLimit": 3,
+  "branchConcurrentLimit": 3,
+  "branchPrefix": "build/deps-",
+  "branchNameStrict": true,
+  "semanticCommits": "enabled",
+  "semanticCommitType": "build",
+  "semanticCommitScope": "deps",
+  "commitMessageAction": "update",
+  "commitBody": "",
+  "commitTrailers": [],
+  "automerge": false,
+  "separateMajorMinor": true,
+  "dependencyDashboard": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "dependencyDashboardApproval": true,
+    "schedule": ["* 0-9 * * 1"],
+    "commitMessageAction": "refresh",
+    "commitMessageTopic": "dependency lockfile"
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "matchDepTypes": ["requires-python"],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": ["lime", "lime-stability"],
+      "enabled": false
+    }
+  ]
+}
