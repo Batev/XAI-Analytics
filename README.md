@@ -53,6 +53,10 @@ containing underscores. Each reason is documented alongside its regression test.
 Passing tests do not establish that the existing scientific correctness issues are resolved.
 Historical examples still contain expensive searches and network downloads.
 
+An advisory [dependency audit](docs/dependency-auditing.md) reports known
+vulnerabilities separately from scanner failures. It does not block merging and
+currently covers the Linux/Python 3.12 dependency set.
+
 ### Supported features
 
 Tabular classification with logistic regression, decision trees, random forests,
@@ -76,8 +80,8 @@ raise an actionable error and unavailable options are hidden or disabled in widg
 SHAP dependence plots remain available and describe SHAP contributions, not PDPs.
 The Census example requires a separately supplied dataset until its loader is replaced.
 
-Original dependency files are preserved under `docs/legacy-environment/` for
-provenance only. Do not install them into the supported environment. Maintained PDP/ICE
+Original dependency files remain in Git history; verified local backups are kept
+in ignored storage. Do not install the historical environment. Maintained PDP/ICE
 and permutation importance replacements are planned separately, followed by correctness
 fixes, a computation package, and a standalone UI.
 

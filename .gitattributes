@@ -1,2 +1,0 @@
-# Preserve historical dependency inputs across platforms.
-docs/legacy-environment/** -text
