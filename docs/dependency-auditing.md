@@ -48,6 +48,8 @@ after the maintenance PRs merge and investigate any still-open advisory against
 its affected range and current locked version. No active finding currently needs
 a suppression or an automatic dependency fix.
 
-The first Linux result is recorded in this PR's workflow summary and artifacts.
+The first Linux/Python 3.12 workflow scan also reported zero findings and no
+skipped packages. Its JSON status/report and scanner log were inspected in
+[the initial workflow run](https://github.com/Batev/XAI-Analytics/actions/runs/41225917034).
 Subsequent scheduled scans provide updated evidence; a clean scan only covers
 advisories known to the scanner at that time.
