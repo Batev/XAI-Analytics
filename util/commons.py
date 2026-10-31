@@ -898,14 +898,15 @@ def _get_nth_ordinal(n: int) -> str:
 
 def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
     """
-    Transform a pd.DataFrame using a One-Hot Encoder from a suitable Pipeline.
-    :param model: OHE from a Pipeline to be used
+    Transform observations using the pipeline's fitted preprocessor without refitting.
+    :param model: A pipeline with a preprocessor already fitted on training data
     :param X: X to be encoded
-    :return: One-Hot encoded pd.DataFrame
+    :param feature_names: Encoded feature names in the fitted preprocessor's output order
+    :return: Encoded pd.DataFrame preserving the input row index
     """
 
-    # model.model[0] to get the preprocessor from the pipeline
-    X_ohe = model[0].fit_transform(X)
+    # Use the fitted preprocessing step from the pipeline.
+    X_ohe = model[0].transform(X)
 
     log.debug(
         "Encoded dataframe shape: {}\nNumber of all encoded features: {}.".format(
@@ -919,7 +920,7 @@ def calculate_X_ohe(model: Pipeline, X: pd.DataFrame, feature_names: list):
         log.debug("An expected error occurred. Program execution may continue: {}".format(e))
         X_ohe = X_ohe
 
-    return pd.DataFrame(X_ohe, columns=feature_names)
+    return pd.DataFrame(X_ohe, index=X.index, columns=feature_names)
 
 
 def generate_feature_importance_plot(type: FeatureImportanceType, model: Model):

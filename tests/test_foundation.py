@@ -144,17 +144,14 @@ def test_csv_http(monkeypatch):
         Dataset.from_url("fixture", "https://example.invalid/data.csv")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="COR-01: explanation transforms refit the preprocessor instead of preserving fitted state",
-)
 def test_regression_transform_does_not_refit(model):
     before = model.model[0].named_transformers_["num"].named_steps["scale"].mean_.copy()
+    probabilities = model.model.predict_proba(model.X_test)
     c.calculate_X_ohe(model.model, model.X_test + 100, model.features_ohe)
     np.testing.assert_allclose(
         model.model[0].named_transformers_["num"].named_steps["scale"].mean_, before
     )
+    np.testing.assert_allclose(model.model.predict_proba(model.X_test), probabilities)
 
 
 @pytest.mark.xfail(
