@@ -81,7 +81,12 @@ to help users migrate, even though the upstream specification permits `!` alone.
 ## Validation and merging
 
 Follow README.md for installation and local verification. Required checks are
-Windows tests, Linux tests, macOS tests, and Ruff lint/format checks. Tests include documented
+Windows tests, Linux tests, macOS tests, and Ruff lint/format checks.
+The PR title check also enforces the Conventional Commit subject format and reruns
+when a title is edited. CI cancels superseded PR runs and limits job duration;
+pushes to `master` keep their own runs.
+
+Tests include documented
 strict expected failures for known scientific defects; a green build does not
 mean those defects have been fixed.
 
