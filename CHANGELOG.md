@@ -18,12 +18,18 @@
 - Windows/Linux/macOS continuous integration, Ruff checks, and test/coverage reports.
 - Strict expected-failure regressions documenting known correctness defects.
 - Contribution, Conventional Commit, branch, merge, and release policies.
+- SHA-pinned Actions, CI timeouts/cancellation, and required PR-title validation.
+- Weekly hosted dependency-maintenance configuration and advisory vulnerability
+  reports with explicit scanner-failure handling.
+- Optional locked pre-commit hooks and bug-report/PR templates.
 
 ### Changed
 
 - Update scientific dependencies and adapt removed scikit-learn APIs and modern
   SHAP output shapes.
 - Add optional training/search and explanation budgets for small real test runs.
+- Retire unsupported historical dependency inputs after verifying local backups;
+  preserve the originals in Git history.
 
 ### Fixed
 
@@ -36,3 +42,7 @@
 Further scientific correctness fixes remain a separate milestone. Known defects are
 documented in the regression tests. This development series is not a stable
 release; the existing v1/v2 tags remain historical releases.
+
+Current pandas, SciPy, and SHAP upgrade attempts retain the newest versions
+compatible with NumPy 1.x. Newer releases require NumPy 2, which is blocked by
+RBO's dependency constraint; see [the assessed versions and follow-up](docs/dependency-maintenance.md#upgrade-assessment--2026-10-31).
