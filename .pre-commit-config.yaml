@@ -1,0 +1,28 @@
+minimum_pre_commit_version: '4.0.0'
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: Ruff lint (locked environment)
+        language: system
+        entry: uv run --no-sync ruff check
+        files: ^(util/|tests/|\.github/scripts/).*\.py$
+        types: [python]
+      - id: ruff-format
+        name: Ruff format check (locked environment)
+        language: system
+        entry: uv run --no-sync ruff format --check
+        files: ^(util/|tests/|\.github/scripts/).*\.py$
+        types: [python]
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        language: system
+        entry: uv run --no-sync trailing-whitespace-fixer --markdown-linebreak-ext=md
+        files: \.(py|ya?ml|toml|md|json)$
+        types: [text]
+      - id: end-of-file-fixer
+        name: Fix final newline
+        language: system
+        entry: uv run --no-sync end-of-file-fixer
+        files: \.(py|ya?ml|toml|md|json)$
+        types: [text]
