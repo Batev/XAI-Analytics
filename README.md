@@ -1,5 +1,3 @@
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Batev/XAI-Analytics/master)
-
 # XAI-Analytics
 
 XAI-Analytics is a tool that opens the black-box of machine learning. It makes model interpretability easy. 
@@ -9,59 +7,75 @@ For a quick demo of **XAI-Analytics** jump to the [demo](#demo) section. For exa
 
 ## Getting started
 
-### Run on _binder_
+The supported environment is **Python 3.12 on Windows and Linux**. Install
+[uv](https://docs.astral.sh/uv/getting-started/installation/), clone this repository,
+and run from its root (PowerShell or a Unix shell):
 
-1. Start the binder notebook server by clicking [here](https://mybinder.org/v2/gh/Batev/XAI-Analytics/master) 
-2. Run *XAI-Analytics.ipynb* notebook file
+```sh
+uv python install 3.12
+uv sync --locked --group notebook --group dev
+uv run --no-sync jupyter notebook XAI-Analytics.ipynb
+```
 
-### <a name="run-locally"></a>Run locally
+uv creates `.venv`; an existing `venv` is preserved. The lockfile is the exact
+development/CI environment. Python 3.7–3.9 and Binder's old environment are no longer
+supported. No dependency bypasses or edits to installed packages are required.
 
-1. Clone the **XAI-Analytics** repository: https://github.com/Batev/XAI-Analytics.git
-1. Navigate to checkout directory in _Bash_ or _Powershell_ and ...
+For pip users, create a Python 3.12 virtual environment and run
+`python -m pip install -r requirements.txt`. This generated export includes the
+notebook interface. Dependency declarations live in `pyproject.toml`; update and
+export them with:
 
-    * Unix
+```sh
+uv lock
+uv sync --locked --group notebook --group dev
+uv export --locked --no-dev --group notebook --no-emit-project --output-file requirements.txt
+```
 
-        ```bash
-        # (Optional) Create a new virtual environment 
-        $> python3 -m venv venv
-        # Start the virtual environment, e.g. venv
-        $> source venv/bin/activate
-        # Install project requirements
-        $> pip3 install -r requirements.txt
-        # Modules with outdated dependencies (e.g. Skater on wordcloud==1.3.1), that are erroneous when installed with pip. 
-        $> pip3 install --no-dependencies --no-cache-dir -r requirements-no-deps.txt 
-        # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary.
-        $> find . -name 'tree_visualizer.py' -exec sed -i 's/from sklearn.externals.six import StringIO/from six import StringIO/g' {} +
-        # Start notebook server
-        $> jupyter notebook
-        ```
+### Development and verification
 
-    * Windows (PowerShell)
+```sh
+uv lock --check
+uv pip check
+uv run --no-sync pytest -q
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+```
 
-        ```powershell
-        # (Optional) Create a new virtual environment 
-        $> python -m venv venv
-        # Start the virtual environment, e.g. venv
-        $> set-executionpolicy RemoteSigned -Scope CurrentUser
-        $> .\venv\Scripts\activate
-        # Install project requirements
-        $> pip install -r requirements.txt
-        # Modules with outdated dependencies (e.g. Skater on wordcloud==1.3.1), that are erroneous when installed with pip.  
-        $> pip install --no-dependencies --no-cache-dir -r requirements-no-deps.txt
-        # Skater only supports scikit-learn<=0.22.2.post1 but other modules require scikit-learn>=0.23.1, therefore this workaround is necessary. If you use python 3.7 or 3.8 the path to skater should be adjusted accordingly, e.g. ...skater-1.1.2-py3.9.egg...
-        $> (Get-Content venv\Lib\site-packages\skater-1.1.2-py3.9.egg\skater\core\visualizer\tree_visualizer.py) | %{$_ -replace "from sklearn.externals.six import StringIO", "from six import StringIO"} | Set-Content venv\Lib\site-packages\skater-1.1.2-py3.9.egg\skater\core\visualizer\tree_visualizer.py
-        # Start notebook server
-        $> jupyter notebook
-        ```
+CI runs the offline test suite on Windows and Linux and checks Ruff on Linux.
+Coverage and JUnit reports are generated without an initial coverage threshold.
+The suite includes a notebook smoke fixture, real classifier/explainer calls, and
+three strict expected failures documented in the [correctness backlog](docs/correctness-backlog.md).
+Passing tests do not establish that the existing scientific correctness issues are resolved.
+Historical examples still contain expensive searches and network downloads.
 
-1. Default browser will be started in current directory
-1. Run *XAI-Analytics.ipynb* notebook file
+### Supported features
 
-## Prerequisites
- * Python >= 3.7* and <= 3.9*
- * Microsoft Visual C++ > 14.0 (Windows only)
+Tabular classification with logistic regression, decision trees, random forests,
+SVC and XGBoost; SHAP; ELI5 for its supported estimators; LIME; optimized LIME with
+CSI/VSI; RBO; local/CSV datasets; and notebook widgets. Regression is not a validated
+workflow. ELI5 support is estimator-dependent, and unsupported combinations may raise.
 
-Please refer to the [requirements file](requirements.txt) for a list of the python module prerequisites. The file excludes [XAI](https://github.com/EthicalML/xai), [Skater](https://github.com/oracle/Skater) and [PDPbox](https://github.com/SauceCat/PDPbox) because of incompatible versions in the dependencies when started with [binder](https://mybinder.org/). The [requirements.txt](requirements.txt) is auto-generated from [requirements.in](requirements.in) (which consists of the raw dependencies) using [pip-compile](https://github.com/jazzband/pip-tools). For using locally with all required modules please refer to the [Run locally](#run-locally) step.
+Tests can pass keyword-only `param_grid`, `cv`, `n_jobs`, and `n_iter` to
+`get_pipeline`, or pass these through `train_model(search_options=...)`.
+`explain_single_instance` accepts `num_samples`, `stability_samples`,
+`stability_calls`, `optimization_samples`, and `optimization_iterations`;
+`Model.init_shap(nsamples=...)` controls SHAP's sample budget. Notebook defaults
+are preserved. Optimized LIME continues using the released lime-stability package
+and its original metrics and optimization algorithm.
+
+### Legacy integrations
+
+Skater, the old PDPbox adapter, and `xai` exploratory plots/Census/demographic-balancing integrations
+are unavailable in the modern environment. Their code is preserved; direct calls
+raise an actionable error and unavailable options are hidden or disabled in widgets.
+SHAP dependence plots remain available and describe SHAP contributions, not PDPs.
+The Census example requires a separately supplied dataset until its loader is replaced.
+
+Original dependency files are preserved under `docs/legacy-environment/` for
+provenance only. Do not install them into the supported environment. Maintained PDP/ICE
+and permutation importance replacements are planned separately, followed by correctness
+fixes, a computation package, and a standalone UI.
 
 ## <a name="demo"></a>Demo
 
@@ -73,6 +87,8 @@ _v1.0_
 Example notebooks can be found in [examples](https://github.com/Batev/XAI-Analytics/tree/master). Quick HTML overview of the example notebooks:
 * [Adult Census Income](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/XAI-Example-Income.html)
 * [Risk Factors for Cervical Cancer](https://htmlpreview.github.io/?https://github.com/Batev/XAI-Analytics/blob/master/XAI-Example-Cervical.html)
+
+Local research prototypes are documented separately in [experiments](experiments/README.md), including LIME stability optimization and explanation-ranking comparisons.
 
 ## Known Issues
 
@@ -95,6 +111,11 @@ Example notebooks can be found in [examples](https://github.com/Batev/XAI-Analyt
 
 * Support for semi-supervised, unsupervised and reinforcement learning.
 * Model interpretation of regression algorithms.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, Conventional Commits,
+pull requests, validation, and releases.
 
 ## Creators
 
