@@ -1,0 +1,116 @@
+{
+  "archived_on": "2026-10-31",
+  "base_commit": "f68b9b8998123cab521041bc05dc8e0d3d05b3cb",
+  "raw_backup": ".local-backups/2026-10-31-before-curation.zip",
+  "files": [
+    {
+      "original_path": "Baseline RBO for XAI-Example-Income-Copy1.ipynb",
+      "archive_path": "notebooks/Baseline RBO for XAI-Example-Income-Copy1.ipynb",
+      "original_sha256": "78231b7b98f6240dc00c8158a265008ad66338f6a58ffa8dff3c7c7481d04e92",
+      "curated_sha256": "dc2dd2ed0a83266bf18f24fff2cb0f20acabfa538fb68618ed5d1139edd4cb95",
+      "action": "preserved cell source; cleared outputs, execution counts, execution timing and widget state"
+    },
+    {
+      "original_path": "Example_Lime_Stability_in_Regression.ipynb",
+      "archive_path": "notebooks/Example_Lime_Stability_in_Regression.ipynb",
+      "original_sha256": "3a0c9e659147d4d5c29933e3af56de4e35f8f13afaa2584d3330e87875662740",
+      "curated_sha256": "86cc6d4c2f4b5ff9f2abe5cd013ce111f5f408f80d88f5517d252d9f95ccea8e",
+      "action": "preserved cell source; cleared outputs, execution counts, execution timing and widget state"
+    },
+    {
+      "original_path": "XAI-Example-Cervical-2.ipynb",
+      "archive_path": "notebooks/XAI-Example-Cervical-2.ipynb",
+      "original_sha256": "066f4fcd57b1e76f712cc1bbe0834aafcc6d9073f6911871ded8fb98347be7be",
+      "curated_sha256": "cd7a524aa556ee682e00e64af3f106398b0df3b2317de7484e84a672497d42ce",
+      "action": "preserved cell source; cleared outputs, execution counts, execution timing and widget state"
+    },
+    {
+      "original_path": "XAI-Example-Income-2.ipynb",
+      "archive_path": "notebooks/XAI-Example-Income-2.ipynb",
+      "original_sha256": "eff66c293c1f7a915059a36df8e113f6100c84446215191d4d1f3dbbb07c32d7",
+      "curated_sha256": "9b1919e9cc765e98ac01766e0d19e8c769851657d703d2a61c5099d5a9fa5e3f",
+      "action": "preserved cell source; cleared outputs, execution counts, execution timing and widget state"
+    },
+    {
+      "original_path": "XAI-Example-Income-Test.ipynb",
+      "archive_path": "notebooks/XAI-Example-Income-Test.ipynb",
+      "original_sha256": "fafe49d3c5f4a496f0ec17a879c057e0e9946cad33effbdb8cd8bad5a44b68d5",
+      "curated_sha256": "1467b960b99b50ca956f782adbc7c25d79a9f4acb6ba3fcdbf6df4379ac27d56",
+      "action": "preserved cell source; cleared outputs, execution counts, execution timing and widget state"
+    },
+    {
+      "original_path": "test22.ipynb",
+      "archive_path": "notebooks/test22.ipynb",
+      "original_sha256": "c6a5db44ef6ebd08744770d834601bb00f93d5bcd7e5416f34e5bb48a23b7fea",
+      "curated_sha256": "0152f4c88b28f8f3cd3e8a458bc5ddc95f0da2439040ddcef3e90bc18a217aa6",
+      "action": "preserved cell source; cleared outputs, execution counts, execution timing and widget state"
+    },
+    {
+      "original_path": "util/particle.py",
+      "archive_path": "helpers/particle.py",
+      "original_sha256": "c59d88c0b66b4d92f1c8a535589d6ea27ed62d608caded73bcd95b527dd5854a",
+      "curated_sha256": "c59d88c0b66b4d92f1c8a535589d6ea27ed62d608caded73bcd95b527dd5854a",
+      "action": "moved unchanged"
+    },
+    {
+      "original_path": "util/stability_utils.py",
+      "archive_path": "helpers/stability_utils.py",
+      "original_sha256": "7e587d3f77157ba55f624270d7905ea9919804e8e68bbe00b226ef1e7d2e645b",
+      "curated_sha256": "7e587d3f77157ba55f624270d7905ea9919804e8e68bbe00b226ef1e7d2e645b",
+      "action": "moved unchanged"
+    },
+    {
+      "original_path": "util/utils.py",
+      "archive_path": "helpers/bayesian_optimization.py",
+      "original_sha256": "f11404edcb41d4a26c1ab22a617add4b5cb9c26b1093752f4165939430f9e953",
+      "curated_sha256": "f11404edcb41d4a26c1ab22a617add4b5cb9c26b1093752f4165939430f9e953",
+      "action": "moved unchanged"
+    },
+    {
+      "original_path": "util/test.py",
+      "archive_path": "scripts/manual_demo.py",
+      "original_sha256": "3323079dcf4ff19c84d1361ba6be4cb8ce70036e223a7a99cbd738a3e9a7b37a",
+      "curated_sha256": "3323079dcf4ff19c84d1361ba6be4cb8ce70036e223a7a99cbd738a3e9a7b37a",
+      "action": "moved unchanged"
+    },
+    {
+      "original_path": "requirements - Copy.txt",
+      "archive_path": "requirements-copy.txt",
+      "original_sha256": "66deff7d4e7c7c4479647e23b4dd03e3535ca289ed1c30500bb2ef4527020236",
+      "curated_sha256": "66deff7d4e7c7c4479647e23b4dd03e3535ca289ed1c30500bb2ef4527020236",
+      "action": "moved unchanged"
+    },
+    {
+      "original_path": "stuff/GridSearch.py",
+      "archive_path": "snippets/GridSearch.py",
+      "original_sha256": "c6cce482d34d08649be514c4729939df2cfd826e077ac9e18d8f6f0bdebc380d",
+      "curated_sha256": "c6cce482d34d08649be514c4729939df2cfd826e077ac9e18d8f6f0bdebc380d",
+      "action": "moved unchanged"
+    },
+    {
+      "original_path": "stuff/PDPs.py",
+      "archive_path": "snippets/PDPs.py",
+      "original_sha256": "7ce84df0c9edb109a7bbca8c1f03f526e70743e40b12d0eaf339f1c3ff45a77a",
+      "curated_sha256": "7ce84df0c9edb109a7bbca8c1f03f526e70743e40b12d0eaf339f1c3ff45a77a",
+      "action": "moved unchanged"
+    },
+    {
+      "original_path": "XAI-Example-Income.ipynb",
+      "archive_path": "notebooks/XAI-Example-Income.ipynb",
+      "original_sha256": "2e6a14b0a0eeecc4d793460fd7f9a778fa39a31026b6fdd20de21ae935595d66",
+      "curated_sha256": "c975596b3af20254c8ea62665a9d77dbe14d96a79e68ef8510a6bb69a2f7fd95",
+      "action": "preserved cell source; cleared outputs, execution counts, execution timing and widget state"
+    }
+  ],
+  "application_patch": {
+    "path": "patches/application-experiments.patch",
+    "sha256": "d345901fa8ca6a824841a2e49ad0c0aa8eded5160e438b95c6eda1e3c6a82fd0"
+  },
+  "restored_application_files": [
+    "XAI-Analytics.ipynb",
+    "XAI-Example-Income.ipynb",
+    "requirements.txt",
+    "requirements-no-deps.txt",
+    "util/commons.py"
+  ]
+}
