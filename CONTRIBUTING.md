@@ -86,6 +86,19 @@ The PR title check also enforces the Conventional Commit subject format and reru
 when a title is edited. CI cancels superseded PR runs and limits job duration;
 pushes to `master` keep their own runs.
 
+The required `lint` job also runs Actionlint on all GitHub Actions workflows and
+the pinned Renovate configuration validator in strict repository mode. It rejects
+invalid workflows, invalid Renovate settings, and settings needing migration.
+The official validator containers are pinned by version and immutable digest;
+Renovate maintains their references through its GitHub Actions manager. To run
+the same checks locally, use the container references and arguments in
+`.github/workflows/ci.yml` with Docker, mounting the repository as the working
+directory.
+
+Test/coverage reports and dependency-audit artifacts are retained for 14 days
+after upload. This applies to new uploads; existing artifacts keep their original
+expiration dates.
+
 Tests include documented
 strict expected failures for known scientific defects; a green build does not
 mean those defects have been fixed.
