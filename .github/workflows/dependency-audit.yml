@@ -48,5 +48,6 @@ jobs:
         if: always()
         with:
           name: dependency-audit
+          retention-days: 14
           path: ${{ runner.temp }}/dependency-audit/
           if-no-files-found: warn

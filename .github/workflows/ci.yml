@@ -42,6 +42,7 @@ jobs:
         if: always()
         with:
           name: test-reports-${{ matrix.os }}
+          retention-days: 14
           path: |
             coverage.xml
             test-results.xml
@@ -56,3 +57,11 @@ jobs:
       - run: uv sync --locked --only-group dev
       - run: uv run --no-sync ruff check .
       - run: uv run --no-sync ruff format --check .
+      - name: Validate GitHub Actions workflows
+        uses: docker://rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: -color
+      - name: Validate Renovate configuration
+        uses: docker://ghcr.io/renovatebot/renovate:44.199.0@sha256:76e0fb8c982004f8f9a6dd041a777f9c8aee6b4b852da862a1217c5ec550e6d9
+        with:
+          args: renovate-config-validator --strict --no-global renovate.json
