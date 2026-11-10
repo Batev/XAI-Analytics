@@ -62,6 +62,6 @@ jobs:
         with:
           args: -color
       - name: Validate Renovate configuration
-        uses: docker://ghcr.io/renovatebot/renovate:44.221.6@sha256:52454eae0bdcb51ddfecc39035e0fc2d97172751124049144e89d44343f6ae81
+        uses: docker://ghcr.io/renovatebot/renovate:44.227.4@sha256:fe058db9710840a4821f20190b3769e3ce709a049b8640aa2bf5f044969fe702
         with:
           args: renovate-config-validator --strict --no-global renovate.json
